@@ -38,7 +38,7 @@ class StompClient:
     If you're mentally retarded enough to not Google what Stomp is and want to know what this is, it's a custom 
     implementation of the [Stomp Client](https://docs.spring.io/spring-framework/reference/web/websocket/stomp.html), anyway.
 
-    Thanks to the [base project](https://github.com/GlassyWing/D) for this wonderful piece of code.
+    Thanks to the [base project](https://github.com/GlassyWing/stomp_ws_py) for this wonderful piece of code.
 
     In case you're reading this to help the project, please go ahead ;) otherwise, go away.
     '''
