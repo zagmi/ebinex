@@ -1,0 +1,6 @@
+PyJWT
+numpy
+pywin32
+selenium
+openai-whisper
+websocket-client
