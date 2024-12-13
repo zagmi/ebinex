@@ -12,7 +12,7 @@ class URLs:
         import urllib.parse
         parsed_url = urllib.parse.urlparse(self.ws)
         return parsed_url.netloc
-
+    
 class Events:
     TRADE = 'trade'
     USER_BALANCE = 'user_balance'

@@ -18,8 +18,12 @@ class Ebinex:
         self.password = password
         self.keep = keep
 
+        self.account_id: Union[str, None]
+        self.access_token: Union[str, None]
+
+        self.subs: List[str] = []
+        self.balance: tp.EbinexWebSocketBalance
         self.trades: Dict[str, List[tp.EbinexTrade]] = {}
-        self.balance: Union[tp.EbinexWebSocketBalance, None] = None
 
         self.urls = URLs()
         self.signals = Signals()  
@@ -152,8 +156,10 @@ class Ebinex:
                 '/topic/execute'
             ]
 
-            for destination in destinations:
-                client.subscribe(destination=destination)
+            for index, destination in enumerate(destinations):
+                sub_id = client.subscribe(destination)
+                if index == 0 or index == 2:
+                    self.subs.append(sub_id)
 
         def on_open(client: StompClient):
             '''Method to process websocket open'''
@@ -174,31 +180,24 @@ class Ebinex:
                         self.signals.balance.set()
             
                 if event == Events.TRADE:
+                    symbol = self.symbol                    
                     trade = tp.EbinexWebSocketTrade(data)
-                    symbol = self.symbol
-                
+          
                     if symbol not in self.trades:
                         self.trades[symbol] = []
                 
                     self.trades[symbol].append(trade)
         
             if self.stomp.msize % 20 == 0:
-                client.ping()
+                client.ping('["↵"]')
         
         @sockthis
         def on_error(client: StompClient, error: str):
             '''Method to process websocket errors'''
 
-        self.__stomphook__ = StompClient(
-            url,
-            on_connected=on_connected,
-            on_message=on_message,
-            on_error=on_error,
-            on_close=on_close,
-            on_open=on_open,
-            header=header
-        )
-
+        self.stomp = StompClient(url, on_connected=on_connected, on_message=on_message, on_error=on_error, on_close=on_close, on_open=on_open, header=header)
+        '''Use me if you know what you're doing, otherwise don't piss me off'''
+        
         self.stomp.connect()
         self.signals.balance.wait()
         self.signals.balance.clear()
@@ -215,10 +214,10 @@ class Ebinex:
             return None
 
     @property
-    def connected(self):
+    def connected(self) -> bool:
         '''Determine if the token is still alive'''
-        assert self.access_token != None
-        assert self.account_id != None
+        assert self.access_token is not None
+        assert self.account_id is not None
 
         params = {
             'authorization': self.access_token,
@@ -228,7 +227,7 @@ class Ebinex:
     
         response = self.requests.get(self.urls.wsInfo, params=params)
         alive_token = tp.EbinexWebSocketInfo(response.json()).websocket
-        return alive_token and self.stomp.connected
+        return alive_token and self.stomp.connected.is_set()
 
 
     @property
@@ -274,7 +273,7 @@ class Ebinex:
 
 
     @property
-    def symbol(self):
+    def symbol(self) -> str:
         return getattr(self.config, 'symbol', next(iter(self.symbols)).symbol)
 
 
@@ -282,11 +281,6 @@ class Ebinex:
     def timeframe(self) -> tp.Timeframe:
         return getattr(self.config, 'timeframe', tp.Timeframe[self.parameters.default_candle_timeframe])
 
-
-    @property
-    def stomp(self):
-        '''Use me if you know what you're doing, otherwise don't piss me off'''
-        return self.__stomphook__
 
     def trade(self, amount: int, direction: tp.Direction):
         trades = self.trades.get(self.symbol)
@@ -313,28 +307,19 @@ class Ebinex:
     def change_environment(self, environment: tp.Environment): 
         if self.environment == environment:
             return
-        
-        deactivate = [key for key, value in self.stomp.subscriptions.items() if '/user/topic/' in value or '/topic/book' in value]
-        for sub_id in deactivate:
-            del self.stomp.subscriptions[sub_id]
+
+        for sub_id in self.subs:
             self.stomp.unsubscribe(sub_id)
-        
-        existing_sub_ids = set(self.stomp.subscriptions.keys())
-        next_id = max(existing_sub_ids, default=0)+1
-        new_sub_ids = []
+        self.subs.clear()
 
-        while len(new_sub_ids) < 2:
-            if next_id not in deactivate and next_id not in existing_sub_ids:
-                new_sub_ids.append(next_id)
-            next_id += 1
-
-        payloads = [
+        destinations = [
             f'/user/topic/{environment.name}',
             r'/topic/book\\c{}\\c{}\\c{}'.format(environment.name, self.symbol, self.timeframe.name),
         ]
 
-        for payload in payloads:
-            self.stomp.send(payload)
+        for destination in destinations:
+            sub_id = self.stomp.subscribe(destination)
+            self.subs.append(sub_id)
 
         self.signals.balance.wait()
         self.signals.balance.clear()
@@ -360,5 +345,5 @@ class Ebinex:
     def close(self):
         if hasattr(self, 'access_token'):
             self.clapback()
-        if hasattr(self, 'client'):
+        if hasattr(self, 'stomp'):
             self.stomp.ws.close()
