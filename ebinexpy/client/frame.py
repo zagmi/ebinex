@@ -1,12 +1,12 @@
-from typing import Dict
+from typing import Any, Dict
 
-class BYTE:
+class Sigma:
     LF = r'\n'
     NULL = r'\u0000'
 
 class Frame:
 
-    def __init__(self, command, headers: Dict, body):
+    def __init__(self, command: str, headers: Dict, body: Any):
         self.command = command
         self.headers = headers
         self.body = body or ''
@@ -22,14 +22,15 @@ class Frame:
             lines.append(f"{name}:{value}")
 
         if self.body is not None and not skip_content_length:
-            lines.append(f'content-length:{len(self.body)}')
+            content_length = len(str(self.body))
+            lines.append(f'content-length:{content_length}')
 
-        lines.append(f'{BYTE.LF}{self.body}')
-        return BYTE.LF.join(lines)
+        lines.append(f'{Sigma.LF}{self.body}')
+        return Sigma.LF.join(lines)
 
     @staticmethod
     def unmarshall(data: str):
-        lines = data.split(BYTE.LF)
+        lines = data.split(Sigma.LF)
         command = lines[0].strip()
         headers = {}
         body = None
@@ -46,12 +47,10 @@ class Frame:
 
         if start + 1 < len(lines):
             body_line = lines[start + 1].strip()
-            body = None if body_line == BYTE.NULL else body_line[:-1]
+            body = None if body_line == Sigma.NULL else body_line[:-1]
 
         return Frame(command, headers, body)
 
     @staticmethod
-    def marshall(command, headers, body):
-        payload = f'{Frame(command, headers, body)}{BYTE.NULL}'
-        payload = payload.encode('unicode_escape').decode('utf-8')
-        return payload.replace('\\\\', '\\')
+    def marshall(command: str, headers: Dict, body: Any):
+        return f'{Frame(command, headers, body)}{Sigma.NULL}'

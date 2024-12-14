@@ -31,12 +31,9 @@ class Timeframe(Enum):
     M5 = 5
     M15 = 15
 
-    @classmethod
-    def fvalue(cls, value):
-        for timeframe in cls:
-            if timeframe.value == value:
-                return timeframe
-        return None
+class Statuses(Enum):
+    PENDING = auto()
+    OPEN = auto()
 
 class Environment(Enum):
     REAL = auto()

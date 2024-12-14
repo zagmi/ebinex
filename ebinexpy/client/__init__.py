@@ -66,11 +66,9 @@ class StompClient:
         self.on_close = on_close
         self.on_error = on_error
         self.on_message = on_message
-
+        
         self.on_connected: Callable[[StompClient]] = kwargs.get('on_connected', DEFAULT_FUNC)
 
-        self.msize = 0
-        '''Number of messages that have come in'''
         self.connected = threading.Event()
         self.subscriptions: Dict[str, Callable] = {}
 
@@ -78,14 +76,13 @@ class StompClient:
             self.on_open(self)
 
         def _on_close(client: websocket.WebSocketApp, code: int, message: str):
-            self.connected = False
+            self.connected.clear()
             self.on_close(self, code)
 
         def _on_error(client: websocket.WebSocketApp, error: str):
             self.on_error(self, error)
 
         def _on_message(client: websocket.WebSocketApp, message: str):
-            self.msize += 1
             self.connected.set()
             frame = Frame.unmarshall(message)
 
@@ -131,9 +128,6 @@ class StompClient:
         headers = kwargs.get('headers', {})
         headers[HDR_DESTINATION] = destination
         return self._transmit(CMD_SEND, headers, body)
-
-    def ping(self, data: Union[bytes, str]):
-        self.ws.send(data)
 
     def subscribe(self, destination, callback: Optional[Callable] = DEFAULT_FUNC, **kwargs) -> str:
         headers: Dict[str, Any] = kwargs.get('headers', {})
@@ -182,9 +176,6 @@ class StompClient:
                 continue
 
         return chunks[0] if len(chunks) == 1 else chunks
-
-    def dumpy(self, payload: Dict):
-        return json.dumps(payload).replace('"', '\\"')
 
     def _transmit(self, command, headers, body=None):
         self.ws.send(f'["{Frame.marshall(command, headers, body)}"]')

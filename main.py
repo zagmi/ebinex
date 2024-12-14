@@ -1,12 +1,13 @@
 import os
 import time
 from ebinexpy import Ebinex
-from ebinexpy.iykyk import Environment
+from ebinexpy.iykyk import Environment, Direction
 
-email = os.environ.get("EBINEX_EMAIL")
-password = os.environ.get("EBINEX_PASSWORD")
+email = "miguelsantiago1940@gmail.com"
+password = "Santiago2024"
 
 client = Ebinex(email, password, keep=True)
-for env in list(Environment):
-    client.change_environment(env)
-    print(client.balance.amount)
+client.change_environment(Environment.TEST)
+time.sleep(10)
+client.order(10, direction=Direction.BULL)
+time.sleep(2*60)

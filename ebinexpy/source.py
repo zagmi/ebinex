@@ -1,6 +1,9 @@
+import itertools
+import threading
 import numpy as np
+import urllib.parse
 import os, base64, time
-import atexit, requests
+import json, atexit, requests
 from typing import Union, Any, Dict, List
 
 import iykyk as tp
@@ -14,6 +17,14 @@ class Ebinex:
     def __init__(self, username: str, password: str, keep=False, **kwargs) -> None:
         atexit.register(self.close)
         
+        if not isinstance(username, str) or not isinstance(password, str):
+            errors = []
+            if not isinstance(username, str):
+                errors.append('username')
+            if not isinstance(password, str):
+                errors.append('password')
+                raise AttributeError(f'It\'s like they\'re missing that spark or something: {", ".join(errors)}.')
+
         self.username = username
         self.password = password
         self.keep = keep
@@ -26,7 +37,8 @@ class Ebinex:
         self.trades: Dict[str, List[tp.EbinexTrade]] = {}
 
         self.urls = URLs()
-        self.signals = Signals()  
+        self.lyap = time.time()
+        self.signals = Signals()
         self.requests = requests.Session()   
         self.config: Union[tp.EbinexConfig, Any] = kwargs.get('config') 
         self.security = Security(kwargs.get('vault', tp.DEFAULT_VAULT))  
@@ -114,7 +126,6 @@ class Ebinex:
         url_parts = [self.urls.ws, str(server_port), session_key, 'websocket']
         '''Composed of a dynamic args, a port and a session key (a length of 8 and 2 numeric chars)'''
             
-        import urllib.parse
         base_url = urllib.parse.urljoin('/'.join(url_parts), '')
 
         params = {
@@ -142,6 +153,7 @@ class Ebinex:
         }
 
         from client import StompClient
+        from client.frame import Sigma
 
         def on_connected(client: StompClient):
             '''Method to process websocket open'''
@@ -161,6 +173,16 @@ class Ebinex:
                 if index == 0 or index == 2:
                     self.subs.append(sub_id)
 
+            def ping_interval():
+                for i in itertools.count():
+                    cyap = time.time()
+                    if cyap - self.lyap >= 10:
+                        payload = f'["{Sigma.LF}"]'
+                        client.ws.send(payload)
+                        self.lyap = cyap
+            
+            threading.Thread(name=nameof(ping_interval), target=ping_interval, daemon=True).start()
+        
         def on_open(client: StompClient):
             '''Method to process websocket open'''
         
@@ -182,14 +204,10 @@ class Ebinex:
                 if event == Events.TRADE:
                     symbol = self.symbol                    
                     trade = tp.EbinexWebSocketTrade(data)
-          
                     if symbol not in self.trades:
                         self.trades[symbol] = []
                 
                     self.trades[symbol].append(trade)
-        
-            if self.stomp.msize % 20 == 0:
-                client.ping('["↵"]')
         
         @sockthis
         def on_error(client: StompClient, error: str):
@@ -229,15 +247,17 @@ class Ebinex:
         alive_token = tp.EbinexWebSocketInfo(response.json()).websocket
         return alive_token and self.stomp.connected.is_set()
 
-
     @property
-    def account(self):
-        response = self.requests.get(self.urls.listAccounts, headers={
+    def headers(self):
+        return {
             'Authorization': f'Bearer {self.access_token}',
             'Accountid': self.account_id,
             'User-Agent': UserAgent.random()
-        })
+        }
 
+    @property
+    def account(self):
+        response = self.requests.get(self.urls.listAccounts, headers=self.headers)
         for account in response.json():
             environment = getattr(self.config, 'environment', tp.Environment.TEST)
             if account.get("environment") == environment.name:
@@ -247,23 +267,13 @@ class Ebinex:
 
     @property
     def symbols(self):
-        response = self.requests.get(self.urls.availableSymbols, headers={
-            'Authorization': f'Bearer {self.access_token}',
-            'Accountid': self.account_id,
-            'User-Agent': UserAgent.random()
-        })
-
+        response = self.requests.get(self.urls.availableSymbols, headers=self.headers)
         return [tp.EbinexSymbol.from_dict(symbol) for symbol in response.json()]
 
 
     @property
     def parameters(self):
-        response = self.requests.get(self.urls.parameters, headers={
-            'Authorization': f'Bearer {self.access_token}',
-            'Accountid': self.account_id,
-            'User-Agent': UserAgent.random()
-        })
-
+        response = self.requests.get(self.urls.parameters, headers=self.headers)
         return tp.EbinexParameters.from_list(response.json())
     
 
@@ -282,7 +292,7 @@ class Ebinex:
         return getattr(self.config, 'timeframe', tp.Timeframe[self.parameters.default_candle_timeframe])
 
 
-    def trade(self, amount: int, direction: tp.Direction):
+    def order(self, amount: int, direction: tp.Direction, **kwargs):        
         trades = self.trades.get(self.symbol)
         if trades:
             asset = self.balance.asset.upper()            
@@ -300,8 +310,27 @@ class Ebinex:
                 amount=amount,
                 asset=asset,
             )
-            
-            self.stomp.send('/topic/execute', body=opts.to_dict())
+
+            body = opts.to_dict()
+            body = json.dumps(body)
+            body = body.replace(' ', '')
+            body = body.replace('"', '\\"').strip()
+            self.stomp.send('/topic/execute', body=body)
+
+
+    def orders(self, timeframes: List[tp.Timeframe], symbols: List[str], statuses: List[tp.Statuses], page: int = 0, size: int = 10):
+            params = {
+                'candleTimeFrames': ','.join([t.name for t in timeframes]),
+                'symbols': ','.join(symbols),
+                'statuses': ','.join([s.name for s in statuses]),
+                'page': page,
+                'size': size
+            }
+
+            url = f'{self.urls.orders}?{urllib.parse.urlencode(params)}'
+            response = self.requests.get(url, headers=self.headers)
+
+            return response.json()
 
 
     def change_environment(self, environment: tp.Environment): 

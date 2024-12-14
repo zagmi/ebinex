@@ -6,6 +6,7 @@ class URLs:
     originUrl = 'https://ebinex.com'     
     login = 'https://ebinex.com/login'
     wsInfo = 'https://ws.ebinex.com/ws/info'
+    orders = 'https://api.ebinex.com/orders'
 
     @property
     def ws_host(self):
