@@ -12,18 +12,23 @@ class Frame:
         self.body = body or ''
 
     def __str__(self):
+        body_size = len(self.body)
+        content_length_header = 'content-length'
+
+        if content_length_header not in self.headers:
+            self.headers[content_length_header] = str(body_size)
+        if 'destination' in self.headers:
+            content_length_value = self.headers.pop(content_length_header)
+            destination_index = list(self.headers.keys()).index('destination') + 1
+            headers_list = list(self.headers.items())
+            headers_list.insert(destination_index, (content_length_header, content_length_value))
+            self.headers = dict(headers_list)
+
         lines = [self.command]
-        skip_content_length = 'content-length' in self.headers
-        if skip_content_length:
-            del self.headers['content-length']
 
         for name in self.headers:
             value = self.headers[name]
             lines.append(f"{name}:{value}")
-
-        if self.body is not None and not skip_content_length:
-            content_length = len(str(self.body))
-            lines.append(f'content-length:{content_length}')
 
         lines.append(f'{Sigma.LF}{self.body}')
         return Sigma.LF.join(lines)

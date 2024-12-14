@@ -1,4 +1,3 @@
-import numpy.random as random
 import ebinexpy.iykyk as tp
 
 

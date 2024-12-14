@@ -1,7 +1,6 @@
 '''if you know, you know, types basically'''
 
 import os
-from strings import Events
 from enum import Enum, auto
 from selenium.webdriver import Chrome
 from datetime import datetime, timedelta
@@ -32,8 +31,21 @@ class Timeframe(Enum):
     M15 = 15
 
 class Statuses(Enum):
+    WIN = auto()
+    LOSE = auto()
+    OPEN = auto()    
     PENDING = auto()
-    OPEN = auto()
+    CANCELED = auto()
+    REFUNDED = auto()
+
+    def __eq__(self, other: Optional['Statuses']):
+        """
+        Same shit happens here, lots of mosquitoes in my room so I'll just do 
+        the same as with Environment and go to sleep.
+        """
+        if hasattr(other, 'name'):
+            return self.name == other.name
+        return NotImplemented
 
 class Environment(Enum):
     REAL = auto()
@@ -82,6 +94,130 @@ class Credentials:
             config=EbinexConfig.from_dict(data.get('config', {})),
             expiration=data.get('expiration')
         )
+
+class EbinexOrder:
+    def __init__(self, 
+                 id: str, 
+                 user_email: str, 
+                 account_id: str, 
+                 environment: Environment, 
+                 candle_time_frame: str, 
+                 candle_start_time: int, 
+                 symbol: str, 
+                 direction: str, 
+                 price: float, 
+                 cop: float, 
+                 ccp: float, 
+                 asset: str, 
+                 invest: float, 
+                 fee_rate: float, 
+                 used_bonus: float, 
+                 fees: float, 
+                 refund: float, 
+                 accept: float, 
+                 profit: float, 
+                 loss: float, 
+                 platform_liquidity: float, 
+                 status: Statuses, 
+                 referral_id: Optional[str], 
+                 referral_commission: Optional[float], 
+                 created_at: int, 
+                 created_at_broker_time: int, 
+                 influencer_order: bool):
+        
+        self.id = id
+        self.user_email = user_email
+        self.account_id = account_id
+        self.environment = environment
+        self.candle_time_frame = candle_time_frame
+        self.candle_start_time = candle_start_time
+        self.symbol = symbol
+        self.direction = direction
+        self.price = price
+        self.cop = cop
+        self.ccp = ccp
+        self.asset = asset
+        self.invest = invest
+        self.fee_rate = fee_rate
+        self.used_bonus = used_bonus
+        self.fees = fees
+        self.refund = refund
+        self.accept = accept
+        self.profit = profit
+        self.loss = loss
+        self.platform_liquidity = platform_liquidity
+        self.status = status
+        self.referral_id = referral_id
+        self.referral_commission = referral_commission
+        self.created_at = created_at
+        self.created_at_broker_time = created_at_broker_time
+        self.influencer_order = influencer_order
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'id': self.id,
+            'user_email': self.user_email,
+            'account_id': self.account_id,
+            'environment': self.environment.name,
+            'candle_time_frame': self.candle_time_frame,
+            'candle_start_time': self.candle_start_time,
+            'symbol': self.symbol,
+            'direction': self.direction,
+            'price': self.price,
+            'cop': self.cop,
+            'ccp': self.ccp,
+            'asset': self.asset,
+            'invest': self.invest,
+            'fee_rate': self.fee_rate,
+            'used_bonus': self.used_bonus,
+            'fees': self.fees,
+            'refund': self.refund,
+            'accept': self.accept,
+            'profit': self.profit,
+            'loss': self.loss,
+            'platform_liquidity': self.platform_liquidity,
+            'status': self.status.name,
+            'referral_id': self.referral_id,
+            'referral_commission': self.referral_commission,
+            'created_at': self.created_at,
+            'created_at_broker_time': self.created_at_broker_time,
+            'influencer_order': self.influencer_order
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'EbinexOrder':
+        return cls(
+            id=data.get('id'),
+            user_email=data.get('userEmail'),
+            account_id=data.get('accountId'),
+            environment=Environment[data.get('environment')],
+            candle_time_frame=data.get('candleTimeFrame'),
+            candle_start_time=data.get('candleStartTime'),
+            symbol=data.get('symbol'),
+            direction=data.get('direction'),
+            price=data.get('price'),
+            cop=data.get('cop'),
+            ccp=data.get('ccp'),
+            asset=data.get('asset'),
+            invest=data.get('invest'),
+            fee_rate=data.get('feeRate'),
+            used_bonus=data.get('usedBonus'),
+            fees=data.get('fees'),
+            refund=data.get('refund'),
+            accept=data.get('accept'),
+            profit=data.get('profit'),
+            loss=data.get('loss'),
+            platform_liquidity=data.get('platformLiquidity'),
+            status=Statuses[data.get('status')],
+            referral_id=data.get('referralId'),
+            referral_commission=data.get('referralCommission'),
+            created_at=data.get('createdAt'),
+            created_at_broker_time=data.get('createdAtBrokerTime'),
+            influencer_order=data.get('influencerOrder')
+        )
+    
+    def update(self, other: 'EbinexOrder'):
+        self.__dict__.update(other.__dict__)
 
 class EbinexTrade:
     def __init__(self, account_id: str, timeframe: Timeframe, symbol: str, direction: Direction, amount: int, asset: str, price: float):
@@ -174,6 +310,30 @@ class EbinexAccount:
             user_role=data.get('userRole'),
             default_coin_balance=data.get('defaultCoinBalance', 0.0),
             label=data.get('label')
+        )
+
+class EbinexPriceData:
+    def __init__(self, timestamp: int, open_price: float, high: float, low: float, close: float, n: Optional[int] = None, v: Optional[float] = None, vw: Optional[float] = None):
+        self.timestamp = timestamp
+        self.open_price = open_price
+        self.high = high
+        self.low = low
+        self.close = close
+        self.n = n
+        self.v = v
+        self.vw = vw
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'EbinexPriceData':
+        return cls(
+            timestamp=data['t'],
+            open_price=data['o'],
+            high=data['h'],
+            low=data['l'],
+            close=data['c'],
+            n=data.get('n'),
+            v=data.get('v'),
+            vw=data.get('vw')
         )
 
 class EbinexParameters:
@@ -308,44 +468,27 @@ class EbinexWebSocketInfo:
         return self.data.get('websocket')
 
 class EbinexWebSocketTrade:
-    def __init__(self, data: Dict[str, Any]):
-        self.__data__ = data
-        foreseen_event = Events.TRADE
-        event = self.__data__.get('event', '')
+    def __init__(self, timestamp: int, volume: float, price: float):
+        self.timestamp = timestamp
+        self.volume = volume        
+        self.price = price
 
-        if foreseen_event != event:
-            raise ValueError(f"Expected '{foreseen_event}' to infer attributes.")
-
-    @property
-    def timestamp(self) -> int:
-        payload: Dict[str, Any] = self.__data__.get('payload', {})
-        return payload.get('t', 0)
-
-    @property
-    def price(self) -> float:
-        payload: Dict[str, Any] = self.__data__.get('payload', {})
-        return payload.get('p', 0.0)
-
-    @property
-    def volume(self) -> float:
-        payload: Dict[str, Any] = self.__data__.get('payload', {})
-        return payload.get('v', 0.0)
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'EbinexWebSocketTrade':
+        return cls(
+            timestamp=data.get('t'),
+            volume=data.get('v'),
+            price=data.get('p'),
+        )
 
 class EbinexWebSocketBalance:
-    def __init__(self, data: Dict[str, Any]):
-        self.__data__ = data
-        foreseen_event = Events.USER_BALANCE
-        event = self.__data__.get('event', '')
+    def __init__(self, amount: float, asset: str):
+        self.amount = amount
+        self.asset = asset
 
-        if foreseen_event != event:
-            raise ValueError(f"Expected '{foreseen_event}' to infer attributes.")
-
-    @property
-    def amount(self) -> float:
-        payload: Dict[str, Any] = self.__data__.get('payload', {})
-        return next(iter(payload.values()), 0.0)
-
-    @property
-    def asset(self) -> str:
-        payload: Dict[str, Any] = self.__data__.get('payload', {})
-        return next(iter(payload.keys()), '')
+    @classmethod
+    def from_dict(cls, data: Dict[str, float]):
+        return cls(
+            amount=next(iter(data.values()), 0.0),
+            asset=next(iter(data.keys()), '')
+        )

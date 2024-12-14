@@ -7,6 +7,7 @@ from typing import (
     List,
     Dict,
     Union,
+    overload,
     Callable,
     Optional,
 )
@@ -30,7 +31,7 @@ from .constants import (
     HDR_ACCEPT_VERSION,
 )
 
-from ebinexpy.utils import nameof
+from varname import nameof
 from ebinexpy.iykyk import DEFAULT_FUNC
 
 
@@ -111,7 +112,7 @@ class StompClient:
             kwargs={'suppress_origin': True},
         ).start()
 
-    def connect(self, headers: Optional[Dict] = {}):
+    def connect(self, headers: Dict = {}):
         self.connected.wait()
 
         headers[HDR_ACCEPT_VERSION] = VERSION
@@ -119,7 +120,7 @@ class StompClient:
 
         self._transmit(CMD_CONNECT, headers)
 
-    def disconnect(self, headers={}):
+    def disconnect(self, headers: Dict = {}):
         self._transmit(CMD_DISCONNECT, headers)
         self.ws.close()
 
@@ -129,7 +130,7 @@ class StompClient:
         headers[HDR_DESTINATION] = destination
         return self._transmit(CMD_SEND, headers, body)
 
-    def subscribe(self, destination, callback: Optional[Callable] = DEFAULT_FUNC, **kwargs) -> str:
+    def subscribe(self, destination, callback: Callable = DEFAULT_FUNC, **kwargs) -> str:
         headers: Dict[str, Any] = kwargs.get('headers', {})
         sub_id = headers.get(HDR_ID, None)
 
@@ -143,7 +144,7 @@ class StompClient:
 
         return sub_id
 
-    def unsubscribe(self, id):
+    def unsubscribe(self, id: str):
         del self.subscriptions[id]
         return self._transmit(CMD_UNSUBSCRIBE, {HDR_ID: id})
 
@@ -158,6 +159,14 @@ class StompClient:
         headers[HDR_MESSAGE_ID] = message_id
         headers[HDR_SUBSCRIPTION] = subscription
         return self._transmit(CMD_NACK, headers)
+
+    @overload
+    def jsonify(self, data: str) -> Dict:
+        ...
+
+    @overload
+    def jsonify(self, data: str) -> List:
+        ...
 
     def jsonify(self, data: str) -> Union[Dict, List]:
         data = data.strip()
@@ -176,6 +185,9 @@ class StompClient:
                 continue
 
         return chunks[0] if len(chunks) == 1 else chunks
+
+    def dumpy(self, data: Dict):
+        return json.dumps(data).replace(' ', '').replace('"', r'\"').strip()
 
     def _transmit(self, command, headers, body=None):
         self.ws.send(f'["{Frame.marshall(command, headers, body)}"]')

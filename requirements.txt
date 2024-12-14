@@ -1,6 +1,7 @@
 PyJWT
 numpy
 pywin32
+varname
 selenium
 openai-whisper
 websocket-client

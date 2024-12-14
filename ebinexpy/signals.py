@@ -1,5 +1,9 @@
+import queue
+import threading
+
+
 class Signals:
-    import threading
-    trade = threading.Event()
-    balance = threading.Event()
-    connected = threading.Event()
+    order = queue.Queue()
+    trade = queue.Queue() 
+    balance = queue.Queue()    
+

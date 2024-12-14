@@ -1,9 +1,11 @@
-import numpy.random as random
 import ebinexpy.iykyk as tp
+import numpy.random as random
 
 
 def test_trade(client: tp.Ebinex):
-    client.change_environment(tp.Environment.TEST)
+    environment = tp.Environment.TEST
+    client.change_environment(environment)
     direction = random.choice(list(tp.Direction))
-    client.order(1, direction=direction)
-    assert client.balance is not None
+    order, wait = client.order(1, direction=direction)
+    wait(until=[tp.Statuses.WIN, tp.Statuses.LOSE])
+    assert client.environment == order.environment

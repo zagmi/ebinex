@@ -3,44 +3,55 @@ import threading
 import numpy as np
 import urllib.parse
 import os, base64, time
-import json, atexit, requests
-from typing import Union, Any, Dict, List
+import atexit, requests
+from concurrent.futures import ThreadPoolExecutor, Future
+from typing import (
+    Any,
+    Dict,
+    List,
+    Tuple,
+    Union,
+    Callable,         
+)
 
 import iykyk as tp
+from utils import sockthis
+from varname import nameof
 from signals import Signals
 from security import Security
 from user_agent import UserAgent
 from strings import Events, URLs
-from utils import nameof, sockthis
+
 
 class Ebinex:
     def __init__(self, username: str, password: str, keep=False, **kwargs) -> None:
         atexit.register(self.close)
-        
+
         if not isinstance(username, str) or not isinstance(password, str):
             errors = []
             if not isinstance(username, str):
-                errors.append('username')
+                errors.append(nameof(username))
             if not isinstance(password, str):
-                errors.append('password')
+                errors.append(nameof(password))
                 raise AttributeError(f'It\'s like they\'re missing that spark or something: {", ".join(errors)}.')
 
         self.username = username
         self.password = password
         self.keep = keep
 
-        self.account_id: Union[str, None]
-        self.access_token: Union[str, None]
+        self.account_id: Union[str, None] = None
+        self.access_token: Union[str, None] = None
 
         self.subs: List[str] = []
         self.balance: tp.EbinexWebSocketBalance
+        self.ords: Dict[str, tp.EbinexOrder] = {}
         self.trades: Dict[str, List[tp.EbinexTrade]] = {}
 
         self.urls = URLs()
         self.lyap = time.time()
         self.signals = Signals()
-        self.requests = requests.Session()   
-        self.config: Union[tp.EbinexConfig, Any] = kwargs.get('config') 
+        self.requests = requests.Session()
+        self.config: tp.EbinexConfig = kwargs.get('config')    
         self.security = Security(kwargs.get('vault', tp.DEFAULT_VAULT))  
 
         logger = kwargs.get('logger')
@@ -59,11 +70,11 @@ class Ebinex:
         if credentials:
             account_id = credentials.account_id
             access_token = credentials.access_token
-            if self.config is None:
-                setattr(self, 'config', credentials.config)
+            self.config = self.config or credentials.config
 
         else:
             try:
+                import winreg
                 from captcha import Captcha      
                 from selenium.webdriver.common.by import By
                 from selenium.webdriver import Chrome as WebDriver
@@ -71,13 +82,20 @@ class Ebinex:
                 from selenium.webdriver.chrome.options import Options as DriverOpts
                 from selenium.webdriver.chrome.service import Service as DriverService
         
+                try:
+                    registry_path = r'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe'
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, registry_path) as key:
+                        executable_path, _ = winreg.QueryValueEx(key, '')
+                except FileNotFoundError:
+                    pass
+
                 options = DriverOpts()
                 options.add_argument('--incognito')
                 options.add_argument('--no-sandbox')
                 options.add_argument('--headless=new') 
                 options.add_argument('--disable-dev-shm-usage')
                 options.add_argument(f'user-agent={UserAgent.random()}')
-                service = DriverService(executable_path=self.executable_path)
+                service = DriverService(executable_path=executable_path)
                 driver = WebDriver(options=options, keep_alive=True)
 
 
@@ -181,55 +199,56 @@ class Ebinex:
                         client.ws.send(payload)
                         self.lyap = cyap
             
-            threading.Thread(name=nameof(ping_interval), target=ping_interval, daemon=True).start()
+            threading.Thread(
+                name=nameof(ping_interval),
+                target=ping_interval,
+                daemon=True,
+            ).start()
         
         def on_open(client: StompClient):
-            '''Method to process websocket open'''
-        
+            '''Method to process Stomp open'''
+            pass
+
         def on_close(client: StompClient, code: int):
-            '''Method to process websocket close'''
+            '''Method to process Stomp close'''
+            pass
 
         @sockthis
-        def on_message(client: StompClient, message: dict):
-            '''Method to process websocket messages'''
+        def on_message(client: StompClient, message: Union[Dict, List]):
+            '''Method to process Stomp messages'''
             if isinstance(message, dict):
                 data: Dict[str, Any] = message.get('data', {})
-                event = data.get('event', None)
+                payload: Dict[str, Any] = data.get('payload', {})
             
-                if event == Events.USER_BALANCE:
-                    setattr(self, 'balance', tp.EbinexWebSocketBalance(data))
-                    if not self.signals.balance.is_set():
-                        self.signals.balance.set()
-            
-                if event == Events.TRADE:
-                    symbol = self.symbol                    
-                    trade = tp.EbinexWebSocketTrade(data)
-                    if symbol not in self.trades:
-                        self.trades[symbol] = []
-                
-                    self.trades[symbol].append(trade)
+                match data.get('event', None):
+                    case Events.TRADE:
+                        symbol = self.symbol            
+                        trade = tp.EbinexWebSocketTrade.from_dict(payload)
+                        if symbol not in self.trades:
+                            self.trades[symbol] = []
+                        self.trades[symbol].append(trade)
+                        self.signals.trade.put(self.trades)
+
+                    case Events.USER_BALANCE:
+                        self.balance = tp.EbinexWebSocketBalance.from_dict(payload)
+                        self.signals.balance.put(self.balance)
+
+                    case Events.SINGLE_USER_ORDER:
+                        order = tp.EbinexOrder.from_dict(payload)
+                        self.ords[order.id] = order
+                        self.signals.order.put(order)
         
         @sockthis
         def on_error(client: StompClient, error: str):
-            '''Method to process websocket errors'''
+            '''Method to process Stomp errors'''
+            pass
 
         self.stomp = StompClient(url, on_connected=on_connected, on_message=on_message, on_error=on_error, on_close=on_close, on_open=on_open, header=header)
         '''Use me if you know what you're doing, otherwise don't piss me off'''
         
-        self.stomp.connect()
-        self.signals.balance.wait()
-        self.signals.balance.clear()
-
-    @property
-    def executable_path(self) -> Union[str, None]:
-        try:
-            import winreg
-            registry_path = r'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe'
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, registry_path) as key:
-                edge_path, _ = winreg.QueryValueEx(key, '')
-                return edge_path
-        except FileNotFoundError:
-            return None
+        self.stomp.connect()  
+        self.signals.trade.get()  
+        self.signals.balance.get()     
 
     @property
     def connected(self) -> bool:
@@ -284,54 +303,81 @@ class Ebinex:
 
     @property
     def symbol(self) -> str:
-        return getattr(self.config, 'symbol', next(iter(self.symbols)).symbol)
+        if not isinstance(self.config, tp.EbinexConfig):
+            return next(iter(self.symbols)).symbol
+        return self.config.symbol
 
 
     @property
     def timeframe(self) -> tp.Timeframe:
-        return getattr(self.config, 'timeframe', tp.Timeframe[self.parameters.default_candle_timeframe])
+        if not isinstance(self.config, tp.EbinexConfig):
+            return tp.Timeframe[self.parameters.default_candle_timeframe]
+        return self.config.timeframe
 
 
-    def order(self, amount: int, direction: tp.Direction, **kwargs):        
+    def order(self, amount: int, direction: tp.Direction) -> Tuple[tp.EbinexOrder, Callable[[List[tp.Statuses]], None]]: 
+        """
+        Places an order for a specified amount and direction.
+
+        This method retrieves the last trade for the symbol, constructs an order,
+        sends it to the execution topic, and returns the order information. 
+        The callable function provided will block the thread until the order status
+        matches the default status or the one specified as an argument. Upon 
+        unblocking, it updates the order information.
+
+        :param amount: The quantity of the asset to order.
+        :param direction: The direction of the trade (BULL or BEAR).
+    
+        :return: A tuple containing:
+            - An instance of EbinexOrder representing the placed order.
+            - A function that waits for the order status to match specified statuses.
+        """
         trades = self.trades.get(self.symbol)
-        if trades:
-            asset = self.balance.asset.upper()            
-            account_id = self.account.id
-            timeframe = self.timeframe            
-            last_trade = trades[-1]
-            symbol = self.symbol
+        asset = self.balance.asset.upper()            
+        account_id = self.account.id
+        timeframe = self.timeframe            
+        last_trade = trades[-1]
+        symbol = self.symbol
 
-            opts = tp.EbinexTrade(
-                account_id=account_id,
-                price=last_trade.price,
-                timeframe=timeframe,   
-                direction=direction,                            
-                symbol=symbol,
-                amount=amount,
-                asset=asset,
-            )
+        opts = tp.EbinexTrade(
+            account_id=account_id,
+            price=round(last_trade.price, 3),
+            timeframe=timeframe,   
+            direction=direction,                            
+            symbol=symbol,
+            amount=amount,
+            asset=asset,
+        )
 
-            body = opts.to_dict()
-            body = json.dumps(body)
-            body = body.replace(' ', '')
-            body = body.replace('"', '\\"').strip()
-            self.stomp.send('/topic/execute', body=body)
+        payload = opts.to_dict()
+        body = self.stomp.dumpy(payload)
+        self.stomp.send('/topic/execute', body=body, headers={'content-length': 144})
 
+        order: tp.EbinexOrder = self.signals.order.get()
 
-    def orders(self, timeframes: List[tp.Timeframe], symbols: List[str], statuses: List[tp.Statuses], page: int = 0, size: int = 10):
-            params = {
-                'candleTimeFrames': ','.join([t.name for t in timeframes]),
-                'symbols': ','.join(symbols),
-                'statuses': ','.join([s.name for s in statuses]),
-                'page': page,
-                'size': size
-            }
+        def wait(until: List[tp.Statuses] = [tp.Statuses.OPEN]):
+            event = threading.Event()
 
-            url = f'{self.urls.orders}?{urllib.parse.urlencode(params)}'
-            response = self.requests.get(url, headers=self.headers)
+            def opawaiter():
+                if any(self.ords[order.id].status == status for status in until):
+                    event.set()
+                else:
+                    order_timer = threading.Timer(1, opawaiter)
+                    order_timer.name = f'opawaiter-{order.id}'
+                    order_timer.daemon = True
+                    order_timer.start()
 
-            return response.json()
+            resolve = threading.Thread(target=opawaiter)
+            resolve.name = f'order-{order.id}'
+            resolve.daemon = True
+            resolve.start()
+        
+            event.wait()
 
+            cap_order = self.ords.get(order.id)
+            order.update(cap_order)
+                
+        return order, wait
 
     def change_environment(self, environment: tp.Environment): 
         if self.environment == environment:
@@ -350,11 +396,38 @@ class Ebinex:
             sub_id = self.stomp.subscribe(destination)
             self.subs.append(sub_id)
 
-        self.signals.balance.wait()
-        self.signals.balance.clear()
-        
-        setattr(self.config, 'environment', environment)
+        self.signals.balance.get() 
+        setattr(self.config, nameof(self.environment), environment)
 
+
+    def orders(self, timeframes: List[tp.Timeframe], symbols: List[str], statuses: List[tp.Statuses], page: int = 0, size: int = 10):
+        params = {
+            'candleTimeFrames': ','.join([t.name for t in timeframes]),
+            'symbols': ','.join(symbols),
+            'statuses': ','.join([s.name for s in statuses]),
+            'page': page,
+            'size': size
+        }
+
+        url = f'{self.urls.orders}?{urllib.parse.urlencode(params)}'
+        response = self.requests.get(url, headers=self.headers)
+
+        return response.json()
+
+
+    def aggregated_trades(self, symbol: str, timeframe: tp.Timeframe, fm: int, to: int, limit: int = 1000) -> List[tp.EbinexPriceData]:
+        params = {
+            'symbol': symbol,
+            'candleTimeFrame': timeframe.name,
+            'from': fm,
+            'to': to,
+            'limit': limit
+        }
+
+        url = f'{self.urls.aggregatedTrades}?{urllib.parse.urlencode(params)}'
+        response = self.requests.get(url, headers=self.headers)
+
+        return [tp.EbinexPriceData(data) for data in response.json()]
 
     def clapback(self):
         '''Ignore me, what I do doesn't matter to you'''
@@ -372,7 +445,8 @@ class Ebinex:
 
 
     def close(self):
-        if hasattr(self, 'access_token'):
+        try:
             self.clapback()
-        if hasattr(self, 'stomp'):
             self.stomp.ws.close()
+        except AttributeError:
+            pass
