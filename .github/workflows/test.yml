@@ -6,12 +6,17 @@ on:
       - main
 
 jobs:
-  set-env-and-test:
+  test:
     runs-on: windows-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+    
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 'latest'
 
       - name: Set environment variables
         run: |
