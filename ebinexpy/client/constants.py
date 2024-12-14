@@ -1,7 +1,7 @@
 """The STOMP command and header name strings."""
 
-VERSION = '1.0,1.1,1.2'
-HEARTBEAT = '10000,10000'
+VERSION = "1.0,1.1,1.2"
+HEARTBEAT = "10000,10000"
 
 HDR_ACCEPT_VERSION = "accept-version"
 HDR_ACK = "ack"

@@ -36,39 +36,41 @@ from ebinexpy.iykyk import DEFAULT_FUNC
 
 
 class StompClient:
-    '''
+    """
     If you're mentally retarded enough to not Google what Stomp is and want to know what this is, it's a custom
     implementation of the [Stomp Client](https://docs.spring.io/spring-framework/reference/web/websocket/stomp.html), anyway.
 
     Thanks to the [base project](https://github.com/GlassyWing/stomp_ws_py) for this wonderful piece of code.
 
     In case you're reading this to help the project, please go ahead ;) otherwise, go away.
-    '''
+    """
 
     def __init__(
         self,
         url: str,
-        on_open: Optional[Callable[['StompClient'], None]] = None,
-        on_close: Optional[Callable[['StompClient', int], None]] = None,
-        on_error: Optional[Callable[['StompClient', str], None]] = None,
-        on_message: Optional[Callable[['StompClient', str], None]] = None,
+        on_open: Optional[Callable[["StompClient"], None]] = None,
+        on_close: Optional[Callable[["StompClient", int], None]] = None,
+        on_error: Optional[Callable[["StompClient", str], None]] = None,
+        on_message: Optional[Callable[["StompClient", str], None]] = None,
         **kwargs,
     ):
-        '''
+        """
         :param url: The URL to connect to.
         :param on_open: Callback function called when the connection opens.
         :param on_close: Callback function called when the connection closes.
         :param on_error: Callback function called when an error occurs.
         :param on_message: Callback function called when a message is received.
         :param kwargs: Other optional arguments.
-        '''
+        """
         self.url = url
         self.on_open = on_open
         self.on_close = on_close
         self.on_error = on_error
         self.on_message = on_message
-        
-        self.on_connected: Callable[[StompClient]] = kwargs.get('on_connected', DEFAULT_FUNC)
+
+        self.on_connected: Callable[[StompClient]] = kwargs.get(
+            "on_connected", DEFAULT_FUNC
+        )
 
         self.connected = threading.Event()
         self.subscriptions: Dict[str, Callable] = {}
@@ -87,30 +89,28 @@ class StompClient:
             self.connected.set()
             frame = Frame.unmarshall(message)
 
-            if 'CONNECTED' in frame.command:
+            if "CONNECTED" in frame.command:
                 self.on_connected(self)
 
-            elif 'MESSAGE' in frame.command:
+            elif "MESSAGE" in frame.command:
                 self.on_message(self, self.jsonify(frame.body))
 
-            elif 'RECEIPT' in frame.command:
+            elif "RECEIPT" in frame.command:
                 pass
 
         self.ws = websocket.WebSocketApp(
             self.url,
-            header=kwargs.get('header'),
+            header=kwargs.get("header"),
             on_message=_on_message,
             on_error=_on_error,
             on_close=_on_close,
             on_open=_on_open,
         )
 
-        threading.Thread(
-            daemon=True,
-            name=nameof(StompClient),
-            target=self.ws.run_forever,
-            kwargs={'suppress_origin': True},
-        ).start()
+        app = threading.Thread(target=self.ws.run_forever, kwargs={"suppress_origin": True})
+        app.name = nameof(StompClient)
+        app.daemon = True
+        app.start()
 
     def connect(self, headers: Dict = {}):
         self.connected.wait()
@@ -125,17 +125,19 @@ class StompClient:
         self.ws.close()
 
     def send(self, destination: str, **kwargs):
-        body = kwargs.get('body', '')
-        headers = kwargs.get('headers', {})
+        body = kwargs.get("body", "")
+        headers = kwargs.get("headers", {})
         headers[HDR_DESTINATION] = destination
         return self._transmit(CMD_SEND, headers, body)
 
-    def subscribe(self, destination, callback: Callable = DEFAULT_FUNC, **kwargs) -> str:
-        headers: Dict[str, Any] = kwargs.get('headers', {})
+    def subscribe(
+        self, destination, callback: Callable = DEFAULT_FUNC, **kwargs
+    ) -> str:
+        headers: Dict[str, Any] = kwargs.get("headers", {})
         sub_id = headers.get(HDR_ID, None)
 
         if sub_id is None:
-            sub_id = f'sub-{len(self.subscriptions)+1}'
+            sub_id = f"sub-{len(self.subscriptions)+1}"
 
         headers[HDR_ID] = sub_id
         headers[HDR_DESTINATION] = destination
@@ -149,31 +151,29 @@ class StompClient:
         return self._transmit(CMD_UNSUBSCRIBE, {HDR_ID: id})
 
     def ack(self, message_id, subscription, **kwargs):
-        headers = kwargs.get('headers', {})
+        headers = kwargs.get("headers", {})
         headers[HDR_MESSAGE_ID] = message_id
         headers[HDR_SUBSCRIPTION] = subscription
         return self._transmit(CMD_ACK, headers)
 
     def nack(self, message_id, subscription, **kwargs):
-        headers = kwargs.get('headers', {})
+        headers = kwargs.get("headers", {})
         headers[HDR_MESSAGE_ID] = message_id
         headers[HDR_SUBSCRIPTION] = subscription
         return self._transmit(CMD_NACK, headers)
 
     @overload
-    def jsonify(self, data: str) -> Dict:
-        ...
+    def jsonify(self, data: str) -> Dict: ...
 
     @overload
-    def jsonify(self, data: str) -> List:
-        ...
+    def jsonify(self, data: str) -> List: ...
 
     def jsonify(self, data: str) -> Union[Dict, List]:
         data = data.strip()
         data = data[:1] + data[2:-1]
-        data = data.replace('\\', '')
+        data = data.replace("\\", "")
 
-        jp = r'\{.*\}'
+        jp = r"\{.*\}"
         matches = re.findall(jp, data, re.DOTALL)
 
         chunks = []
@@ -187,7 +187,7 @@ class StompClient:
         return chunks[0] if len(chunks) == 1 else chunks
 
     def dumpy(self, data: Dict):
-        return json.dumps(data).replace(' ', '').replace('"', r'\"').strip()
+        return json.dumps(data).replace(" ", "").replace('"', r"\"").strip()
 
     def _transmit(self, command, headers, body=None):
         self.ws.send(f'["{Frame.marshall(command, headers, body)}"]')

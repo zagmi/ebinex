@@ -1,15 +1,13 @@
 import os
-import jwt
-import json
-import time
-import base64
+import jwt, json
+import time, base64
 from win32 import win32crypt
 from typing import Dict, Any, Optional
-from iykyk import Credentials, EbinexConfig
+from iykyk import Credentials, EbinexConfig, DEFAULT_VAULT
 
 
 class Security:
-    def __init__(self, vault='vault.json'):
+    def __init__(self, vault=DEFAULT_VAULT):
         self.vault = vault
 
     def encrypt_data(self, data: str):
@@ -22,7 +20,7 @@ class Security:
 
     def load_credentials(self) -> Optional[Credentials]:
         if os.path.exists(self.vault):
-            with open(self.vault, 'r') as f:
+            with open(self.vault, "r") as f:
                 try:
                     credencials_dict: Dict[str, Any] = json.load(f)
                     credentials = Credentials.from_dict(credencials_dict)
@@ -32,29 +30,28 @@ class Security:
                     if credentials.account_id and credentials.access_token:
                         credentials.account_id = self.decrypt_data(credentials.account_id)
                         credentials.access_token = self.decrypt_data(credentials.access_token)
-                        return credentials             
+                        return credentials
                 except:
                     pass
         return None
 
     def save_credentials(self, **kwargs):
-        if 'access_token' not in kwargs:
+        if "access_token" not in kwargs:
             return
 
         try:
-            account_id = kwargs.get('account_id')
-            access_token = kwargs.get('access_token')
-            config = EbinexConfig.from_dict(kwargs.get('config'))
-            payload: Dict[str, Any] = jwt.decode(access_token, options={'verify_signature': False})
-            
+            account_id = kwargs.get("account_id")
+            access_token = kwargs.get("access_token")
+            config = EbinexConfig.from_dict(kwargs.get("config"))
+            payload: Dict[str, Any] = jwt.decode(access_token, options={"verify_signature": False})
+
             account_id = self.encrypt_data(account_id)
-            access_token = self.encrypt_data(access_token)                
-            
-            credentials = Credentials(account_id, access_token, config, payload.get('exp'))
-            
-            with open(self.vault, 'w') as f:
+            access_token = self.encrypt_data(access_token)
+
+            credentials = Credentials(account_id, access_token, config, payload.get("exp"))
+
+            with open(self.vault, "w") as f:
                 json.dump(credentials.to_dict(), f, indent=4)
 
         except:
             return
-
