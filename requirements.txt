@@ -3,5 +3,6 @@ numpy
 pywin32
 varname
 selenium
+requests
 openai-whisper
 websocket-client
