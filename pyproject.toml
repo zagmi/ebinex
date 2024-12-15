@@ -10,21 +10,19 @@ readme = "README.md"
 authors = [
     { name = "Santiago Ramirez", email = "santiirepair@gmail.com" }
 ]
+
 license = { text = "LGPL-2.1" }
-homepage = "https://github.com/zagmi/ebinex"
 requires-python = ">=3.10"
+dependencies = [
+    "PyJWT",
+    "numpy",
+    "pywin32",
+    "varname",
+    "selenium",
+    "requests",
+    "openai-whisper",
+    "websocket-client"
+]
 
-[project.dependencies]
-PyJWT = "*"
-numpy = "*"
-pywin32 = "*"
-varname = "*"
-selenium = "*"
-requests = "*"
-openai-whisper = "*"
-websocket-client = "*"
-
-[project.classifiers]
-"Operating System :: OS Independent"
-"Programming Language :: Python :: 3"
-"License :: OSI Approved :: GNU Lesser General Public License v2.1 (LGPL-2.1)"
+[project.urls]
+homepage = "https://github.com/zagmi/ebinex"
