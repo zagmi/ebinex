@@ -1,8 +1,4 @@
-import importlib
 from setuptools import setup, find_packages
-
-module = importlib.import_module('ebinexpy.version')
-version = module.__version__
 
 def read_requirements(file):
     with open(file) as f:
@@ -11,7 +7,7 @@ def read_requirements(file):
 
 setup(
     name="ebinexpy",
-    version=version,
+    version="0.1.0",
     author="Santiago Ramirez",
     author_email="santiirepair@gmail.com",
     description="📈 The only and most reliable bridge between the broker and you.",
