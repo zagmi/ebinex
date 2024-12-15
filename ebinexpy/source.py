@@ -364,25 +364,8 @@ class Ebinex:
         order: tp.EbinexOrder = self.signals.order.get()
 
         def wait(until: List[tp.Statuses] = [tp.Statuses.OPEN]):
-            event = threading.Event()
-
-            def opawaiter():
-                if any(self.ords[order.id].status == status for status in until):
-                    event.set()
-                else:
-                    order_timer = threading.Timer(1, opawaiter)
-                    order_timer.name = f"opawaiter-{order.id}"
-                    order_timer.daemon = True
-                    order_timer.start()
-
-            resolve = threading.Thread(target=opawaiter)
-            resolve.name = f"order-{order.id}"
-            resolve.daemon = True
-            resolve.start()
-
-            event.wait()
-
-            cap_order = self.ords.get(order.id)
+            while not any(self.ords[order.id].status == status for status in until):
+                cap_order = self.ords.get(order.id)
             order.update(cap_order)
 
         return order, wait
@@ -426,23 +409,36 @@ class Ebinex:
         url = f"{self.urls.orders}?{urllib.parse.urlencode(params)}"
         response = self.requests.get(url, headers=self.headers)
 
-        return response.json()
+        return [tp.EbinexOrder.from_dict(data) for data in response.json()]
 
     def aggregated_trades(
-        self, symbol: str, timeframe: tp.Timeframe, fm: int, to: int, limit: int = 1000
+        self, symbol: str, timeframe: tp.Timeframe, fts: int, tts: int, limit: int = 1000
     ) -> List[tp.EbinexPriceData]:
+        """
+        Retrieves aggregated trade data for a specific symbol over a given timeframe.
+
+        :param symbol: The symbol of the asset for which trade data is requested.
+        :param timeframe: The timeframe for the candle data.
+        :param fts: Start timestamp in milliseconds since the epoch.
+        :param tts: End timestamp in milliseconds since the epoch.
+        :param limit: The maximum number of results to return.
+
+        :return: A list of EbinexPriceData objects representing the aggregated trade data.
+
+        :note: The `fts` and `tts` parameters must be in milliseconds.
+        """
         params = {
             "symbol": symbol,
             "candleTimeFrame": timeframe.name,
-            "from": fm,
-            "to": to,
+            "from": int(fts),
+            "to": int(tts),
             "limit": limit,
         }
 
         url = f"{self.urls.aggregatedTrades}?{urllib.parse.urlencode(params)}"
         response = self.requests.get(url, headers=self.headers)
-
-        return [tp.EbinexPriceData(data) for data in response.json()]
+        
+        return [tp.EbinexPriceData.from_dict(data) for data in response.json()]
 
     def clapback(self):
         """Ignore me, what I do doesn't matter to you"""

@@ -367,7 +367,7 @@ class EbinexPriceData:
     def __init__(
         self,
         timestamp: int,
-        open_price: float,
+        open: float,
         high: float,
         low: float,
         close: float,
@@ -376,7 +376,7 @@ class EbinexPriceData:
         vw: Optional[float] = None,
     ):
         self.timestamp = timestamp
-        self.open_price = open_price
+        self.open = open
         self.high = high
         self.low = low
         self.close = close
@@ -388,7 +388,7 @@ class EbinexPriceData:
     def from_dict(cls, data: Dict[str, Any]) -> "EbinexPriceData":
         return cls(
             timestamp=data["t"],
-            open_price=data["o"],
+            open=data["o"],
             high=data["h"],
             low=data["l"],
             close=data["c"],
