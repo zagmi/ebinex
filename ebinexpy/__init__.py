@@ -8,5 +8,3 @@ warnings.filterwarnings("ignore")
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 from source import Ebinex
-
-__version__ = "0.1.0"
