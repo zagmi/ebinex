@@ -11,8 +11,9 @@ authors = [
     { name = "Santiago Ramirez", email = "santiirepair@gmail.com" }
 ]
 
-license = { text = "LGPL-2.1" }
 requires-python = ">=3.10"
+license = { file = "LICENSE" }
+
 dependencies = [
     "PyJWT",
     "numpy",
