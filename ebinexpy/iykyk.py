@@ -422,7 +422,7 @@ class EbinexParameters:
         user_language: str,
         user_timezone: str,
         default_operation_qty: float,
-        default_candle_timeframe: str,
+        default_candle_timeframe: Timeframe,
         default_symbol: str,
         withdrawal_min_amount: float,
     ):
@@ -434,15 +434,11 @@ class EbinexParameters:
         self.public_api_url = public_api_url
         self.user_registration_on_hold = user_registration_on_hold
         self.liquidity_user_active = liquidity_user_active
-        self.default_referral_percentual_commission = (
-            default_referral_percentual_commission
-        )
+        self.default_referral_percentual_commission = default_referral_percentual_commission
         self.liquidity_user_max_liquidity = liquidity_user_max_liquidity
         self.kyc_enabled = kyc_enabled
         self.randomized_book = randomized_book
-        self.liquidity_user_max_liquidity_per_user = (
-            liquidity_user_max_liquidity_per_user
-        )
+        self.liquidity_user_max_liquidity_per_user = liquidity_user_max_liquidity_per_user
         self.scoped_randomized_book = scoped_randomized_book
         self.automatic_withdrawal_config = automatic_withdrawal_config
         self.dynamic_rlp_parameters = dynamic_rlp_parameters
@@ -492,42 +488,27 @@ class EbinexParameters:
 
         return cls(
             fee_rate=data_dict.get("FEE_RATE"),
-            withdrawal_percentual_fee_rate=data_dict.get(
-                "WITHDRAWAL_PERCENTUAL_FEE_RATE"
-            ),
+            withdrawal_percentual_fee_rate=data_dict.get("WITHDRAWAL_PERCENTUAL_FEE_RATE"),
             candle_time_frames=json.loads(data_dict.get("CANDLE_TIME_FRAMES", "[]")),
             default_coin=data_dict.get("DEFAULT_COIN"),
             public_api_url=data_dict.get("PUBLIC_API_URL"),
-            user_registration_on_hold=data_dict.get("USER_REGISTRATION_ON_HOLD")
-            == "true",
+            user_registration_on_hold=data_dict.get("USER_REGISTRATION_ON_HOLD") == "true",
             liquidity_user_active=data_dict.get("LIQUIDITY_USER_ACTIVE") == "true",
-            default_referral_percentual_commission=float(
-                data_dict.get("DEFAULT_REFERRAL_PERCENTUAL_COMISSION", 0.0)
-            ),
-            liquidity_user_max_liquidity=float(
-                data_dict.get("LIQUIDITY_USER_MAX_LIQUIDITY", 0.0)
-            ),
+            default_referral_percentual_commission=float(data_dict.get("DEFAULT_REFERRAL_PERCENTUAL_COMISSION", 0.0)),
+            liquidity_user_max_liquidity=float(data_dict.get("LIQUIDITY_USER_MAX_LIQUIDITY", 0.0)),
             kyc_enabled=data_dict.get("KYC_ENABLED") == "true",
             randomized_book=json.loads(data_dict.get("RANDOMIZED_BOOK", "{}")),
-            liquidity_user_max_liquidity_per_user=float(
-                data_dict.get("LIQUIDITY_USER_MAX_LIQUIDITY_PER_USER", 0.0)
-            ),
-            scoped_randomized_book=json.loads(
-                data_dict.get("SCOPED_RANDOMIZED_BOOK", "[]")
-            ),
-            automatic_withdrawal_config=json.loads(
-                data_dict.get("AUTOMATIC_WITHDRAWAL_CONFIG", "{}")
-            ),
-            dynamic_rlp_parameters=json.loads(
-                data_dict.get("DYNAMIC_RLP_PARAMETERS", "{}")
-            ),
+            liquidity_user_max_liquidity_per_user=float(data_dict.get("LIQUIDITY_USER_MAX_LIQUIDITY_PER_USER", 0.0)),
+            scoped_randomized_book=json.loads(data_dict.get("SCOPED_RANDOMIZED_BOOK", "[]")),
+            automatic_withdrawal_config=json.loads(data_dict.get("AUTOMATIC_WITHDRAWAL_CONFIG", "{}")),
+            dynamic_rlp_parameters=json.loads(data_dict.get("DYNAMIC_RLP_PARAMETERS", "{}")),
             default_gateway_deposit=data_dict.get("DEFAULT_GATEWAY_DEPOSIT"),
             default_gateway_withdrawal=data_dict.get("DEFAULT_GATEWAY_WITHDRAWAL"),
             symbols_config=json.loads(data_dict.get("SYMBOLS_CONFIG", "{}")),
             user_language=data_dict.get("USER_LANGUAGE"),
             user_timezone=data_dict.get("USER_TIMEZONE"),
             default_operation_qty=float(data_dict.get("DEFAULT_OPERATION_QTY", 0.0)),
-            default_candle_timeframe=data_dict.get("DEFAULT_CANDLE_TIMEFRAME"),
+            default_candle_timeframe=Timeframe[data_dict.get("DEFAULT_CANDLE_TIMEFRAME")],
             default_symbol=data_dict.get("DEFAULT_SYMBOL"),
             withdrawal_min_amount=float(data_dict.get("WITHDRAWAL_MIN_AMOUNT", 0.0)),
         )

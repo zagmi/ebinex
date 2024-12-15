@@ -318,7 +318,7 @@ class Ebinex:
     @property
     def timeframe(self) -> tp.Timeframe:
         if not isinstance(self.config, tp.EbinexConfig):
-            return tp.Timeframe[self.parameters.default_candle_timeframe]
+            return self.parameters.default_candle_timeframe
         return self.config.timeframe
 
     def order(
