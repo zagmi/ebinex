@@ -1,9 +1,8 @@
+import os 
 import itertools
 import threading
-import numpy as np
 import urllib.parse
-import os, base64, time
-import atexit, requests
+import atexit, base64, time
 from typing import (
     Any,
     Dict,
@@ -45,6 +44,9 @@ class Ebinex:
         self.balance: tp.EbinexWebSocketBalance
         self.ords: Dict[str, tp.EbinexOrder] = {}
         self.trades: Dict[str, List[tp.EbinexTrade]] = {}
+
+        import requests
+        import numpy as np
 
         self.urls = URLs()
         self.lyap = time.time()
