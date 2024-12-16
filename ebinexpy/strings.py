@@ -18,6 +18,7 @@ class URLs:
 
 
 class Events:
+    BOOK = "book"
     TRADE = "trade"
     USER_BALANCE = "user_balance"
     SINGLE_USER_ORDER = "single_user_order"

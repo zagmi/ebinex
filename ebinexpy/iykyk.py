@@ -32,6 +32,15 @@ class Timeframe(Enum):
     M5 = 5
     M15 = 15
 
+    def __eq__(self, other: Optional["Timeframe"]):
+        if hasattr(other, "name"):
+            return self.name == other.name
+        return NotImplemented
+
+    def __ne__(self, other: Optional["Timeframe"]):
+        if hasattr(other, "name"):
+            return self.name != other.name
+        return NotImplemented
 
 class Statuses(Enum):
     WIN = auto()
@@ -50,7 +59,11 @@ class Statuses(Enum):
             return self.name == other.name
         return NotImplemented
 
-
+    def __ne__(self, other: Optional["Statuses"]):
+        if hasattr(other, "name"):
+            return self.name != other.name
+        return NotImplemented
+    
 class Environment(Enum):
     REAL = auto()
     TEST = auto()
@@ -74,7 +87,11 @@ class Environment(Enum):
         if hasattr(other, "name"):
             return self.name == other.name
         return NotImplemented
-
+    
+    def __ne__(self, other: Optional["Environment"]):
+        if hasattr(other, "name"):
+            return self.name != other.name
+        return NotImplemented
 
 class Credentials:
     def __init__(
@@ -104,6 +121,41 @@ class Credentials:
             access_token=data.get("access_token"),
             config=EbinexConfig.from_dict(data.get("config", {})),
             expiration=data.get("expiration"),
+        )
+
+
+class EbinexBook:
+    class Investment:
+        def __init__(self, id: str, accountId: str, invest: float, createdAt: int):
+            self.id = id
+            self.accountId = accountId
+            self.invest = invest
+            self.createdAt = createdAt
+
+        @classmethod
+        def from_dict(cls, data: Dict[str, Any]) -> "EbinexBook.Investment":
+            return cls(
+                id=data["id"],
+                accountId=data["accountId"],
+                invest=data["invest"],
+                createdAt=data["createdAt"],
+            )
+
+    def __init__(self, timeframe: Timeframe, symbol: str, bull: List[Investment], bear: List[Investment]):
+        self.timeframe = timeframe
+        self.symbol = symbol
+        self.bull = bull
+        self.bear = bear
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "EbinexBook":
+        bull_investments = [EbinexBook.Investment.from_dict(b) for b in data["bull"]]
+        bear_investments = [EbinexBook.Investment.from_dict(b) for b in data["bear"]]
+        return cls(
+            timeframe=Timeframe[data["candleTimeFrame"]],
+            symbol=data["symbol"],
+            bull=bull_investments,
+            bear=bear_investments,
         )
 
 

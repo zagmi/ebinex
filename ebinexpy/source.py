@@ -1,9 +1,11 @@
+import copy
 import itertools
 import threading
 import numpy as np
 import urllib.parse
 import os, base64, time
 import atexit, requests
+from difflib import SequenceMatcher
 from typing import (
     Any,
     Dict,
@@ -41,7 +43,8 @@ class Ebinex:
         self.account_id: Union[str, None] = None
         self.access_token: Union[str, None] = None
 
-        self.subs: List[str] = []
+        self.book: tp.EbinexBook
+        self.subs: Dict[str, str] = {}
         self.balance: tp.EbinexWebSocketBalance
         self.ords: Dict[str, tp.EbinexOrder] = {}
         self.trades: Dict[str, List[tp.EbinexTrade]] = {}
@@ -194,7 +197,7 @@ class Ebinex:
             for index, destination in enumerate(destinations):
                 sub_id = client.subscribe(destination)
                 if index == 0 or index == 2:
-                    self.subs.append(sub_id)
+                    self.subs[sub_id] = destination
 
             def ping_interval():
                 for i in itertools.count():
@@ -225,6 +228,10 @@ class Ebinex:
                 payload: Dict[str, Any] = data.get("payload", {})
 
                 match data.get("event", None):
+                    case Events.BOOK:
+                        self.book = tp.EbinexBook.from_dict(payload)
+                        self.signals.book.put(self.book)      
+                    
                     case Events.TRADE:
                         symbol = self.symbol
                         trade = tp.EbinexWebSocketTrade.from_dict(payload)
@@ -370,22 +377,69 @@ class Ebinex:
 
         return order, wait
 
-    def change_environment(self, environment: tp.Environment):
-        if self.environment == environment:
+    def change_symbol(self, symbol: str):
+        if symbol == self.symbol:
             return
 
-        for sub_id in self.subs:
-            self.stomp.unsubscribe(sub_id)
-        self.subs.clear()
+        destinations = [
+            r"/topic/graph\\c{}".format(symbol),
+            r"/topic/book\\c{}\\c{}\\c{}".format(self.environment.name, symbol, self.timeframe.name),
+        ]
+
+        for destination in destinations:
+            for key, value in copy.deepcopy(self.subs).items():
+                if self.llke(destination, value):
+                    self.stomp.unsubscribe(key)
+                    del self.subs[key]
+
+        for destination in destinations:
+            sub_id = self.stomp.subscribe(destination)
+            self.subs[sub_id] = destination
+
+        self.signals.trade.get()
+        setattr(self.config, nameof(self.symbol), symbol)
+
+    def change_timeframe(self, timeframe: tp.Timeframe):
+        if timeframe == self.timeframe:
+            return
+
+        destinations = [
+            r"/topic/book\\c{}\\c{}\\c{}".format(self.environment.name, self.symbol, timeframe.name),
+        ]
+
+        for destination in destinations:
+            for key, value in copy.deepcopy(self.subs).items():
+                if self.llke(destination, value):
+                    self.stomp.unsubscribe(key)
+                    del self.subs[key]
+
+        for destination in destinations:
+            sub_id = self.stomp.subscribe(destination)
+            self.subs[sub_id] = destination
+    
+        while timeframe != self.book.timeframe:
+            self.signals.book.get()                
+
+        setattr(self.config, nameof(self.timeframe), timeframe)
+
+    def change_environment(self, environment: tp.Environment):
+        if environment == self.environment:
+            return
 
         destinations = [
             f"/user/topic/{environment.name}",
             r"/topic/book\\c{}\\c{}\\c{}".format(environment.name, self.symbol, self.timeframe.name),
         ]
+        
+        for destination in destinations:
+            for key, value in copy.deepcopy(self.subs).items():
+                if self.llke(destination, value):
+                    self.stomp.unsubscribe(key)
+                    del self.subs[key]
 
         for destination in destinations:
             sub_id = self.stomp.subscribe(destination)
-            self.subs.append(sub_id)
+            self.subs[sub_id] = destination
 
         self.signals.balance.get()
         setattr(self.config, nameof(self.environment), environment)
@@ -453,6 +507,10 @@ class Ebinex:
         )
 
         self.security.save_credentials(**credentials.to_dict())
+
+    def llke(self, x, y, threshold=0.8):
+        similarity  = SequenceMatcher(None, x, y).ratio()
+        return similarity >= threshold
 
     def close(self):
         try:

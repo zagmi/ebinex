@@ -1,7 +1,6 @@
 import ebinexpy.iykyk as tp
 import numpy.random as random
 
-
 def test_trade(client: tp.Ebinex):
     environment = tp.Environment.TEST
     client.change_environment(environment)
