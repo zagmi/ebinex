@@ -5,7 +5,6 @@ import numpy as np
 import urllib.parse
 import os, base64, time
 import atexit, requests
-from difflib import SequenceMatcher
 from typing import (
     Any,
     Dict,
@@ -16,27 +15,27 @@ from typing import (
 )
 
 import iykyk as tp
-from utils import sockthis
 from varname import nameof
 from signals import Signals
 from security import Security
+from utils import llke, sockthis
 from user_agent import UserAgent
 from strings import Events, URLs
 
 
 class Ebinex:
-    def __init__(self, username: str, password: str, keep=False, **kwargs) -> None:
+    def __init__(self, email: str, password: str, keep=False, **kwargs) -> None:
         atexit.register(self.close)
 
-        if not isinstance(username, str) or not isinstance(password, str):
+        if not isinstance(email, str) or not isinstance(password, str):
             errors = []
-            if not isinstance(username, str):
-                errors.append(nameof(username))
+            if not isinstance(email, str):
+                errors.append(nameof(email))
             if not isinstance(password, str):
                 errors.append(nameof(password))
                 raise AttributeError(f'It\'s like they\'re missing that spark or something: {", ".join(errors)}')
 
-        self.username = username
+        self.email = email
         self.password = password
         self.keep = keep
 
@@ -74,7 +73,8 @@ class Ebinex:
                 level=logging.INFO,
             )
 
-        credentials = self.security.load_credentials()
+        sign = self.security.sign(self.email)
+        credentials = self.security.load_credentials(sign)
         if credentials:
             account_id = credentials.account_id
             access_token = credentials.access_token
@@ -108,7 +108,7 @@ class Ebinex:
 
                 driver.get(self.urls.login)
                 WebDriverWait(driver, 10).until(lambda d: "Entrar" in d.page_source)
-                driver.find_element(By.CSS_SELECTOR, 'input[type="email"]').send_keys(self.username)
+                driver.find_element(By.CSS_SELECTOR, 'input[type="email"]').send_keys(self.email)
                 driver.find_element(By.CSS_SELECTOR, 'input[type="password"]').send_keys(self.password)
                 driver.find_element(By.NAME, "keepLoggedIn").click()
                 Captcha(driver).resolve()
@@ -388,7 +388,7 @@ class Ebinex:
 
         for destination in destinations:
             for key, value in copy.deepcopy(self.subs).items():
-                if self.llke(destination, value):
+                if llke(destination, value):
                     self.stomp.unsubscribe(key)
                     del self.subs[key]
 
@@ -409,7 +409,7 @@ class Ebinex:
 
         for destination in destinations:
             for key, value in copy.deepcopy(self.subs).items():
-                if self.llke(destination, value):
+                if llke(destination, value):
                     self.stomp.unsubscribe(key)
                     del self.subs[key]
 
@@ -433,7 +433,7 @@ class Ebinex:
         
         for destination in destinations:
             for key, value in copy.deepcopy(self.subs).items():
-                if self.llke(destination, value):
+                if llke(destination, value):
                     self.stomp.unsubscribe(key)
                     del self.subs[key]
 
@@ -497,6 +497,7 @@ class Ebinex:
     def clapback(self):
         """Ignore me, what I do doesn't matter to you"""
         credentials = tp.Credentials(
+            sign=self.security.sign(self.email),
             access_token=self.access_token,
             account_id=self.account_id,
             config=tp.EbinexConfig(
@@ -506,11 +507,7 @@ class Ebinex:
             ),
         )
 
-        self.security.save_credentials(**credentials.to_dict())
-
-    def llke(self, x, y, threshold=0.8):
-        similarity  = SequenceMatcher(None, x, y).ratio()
-        return similarity >= threshold
+        self.security.save_credentials(self.email, **credentials.to_dict())
 
     def close(self):
         try:

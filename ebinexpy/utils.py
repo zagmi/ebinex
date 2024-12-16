@@ -1,5 +1,33 @@
 import logging
 from functools import wraps
+from difflib import SequenceMatcher
+from typing import overload, Union, List, Tuple
+
+
+@overload
+def llke(x: str, y: str, threshold: float = 0.8) -> bool: ...
+
+
+@overload
+def llke(
+    x: List[Union[str, int]], y: List[Union[str, int]], threshold: float = 0.8
+) -> bool: ...
+
+
+@overload
+def llke(
+    x: Tuple[Union[str, int]], y: Tuple[Union[str, int]], threshold: float = 0.8
+) -> bool: ...
+
+
+def llke(
+    x: Union[str, List[Union[str, int]], Tuple[Union[str, int]]],
+    y: Union[str, List[Union[str, int]], Tuple[Union[str, int]]],
+    threshold: float = 0.8,
+) -> bool:
+    """Checks the equality between the given elements."""
+    similarity = SequenceMatcher(None, x, y).ratio()
+    return similarity >= threshold
 
 
 def sockthis(func):

@@ -96,11 +96,13 @@ class Environment(Enum):
 class Credentials:
     def __init__(
         self,
+        sign: str,
         account_id: str,
         access_token: str,
         config: "EbinexConfig",
         expiration=DEFAULT_EXPIRATION,
     ):
+        self.sign = sign    
         self.account_id = account_id
         self.access_token = access_token
         self.config = config
@@ -108,6 +110,7 @@ class Credentials:
 
     def to_dict(self) -> Dict:
         return {
+            "sign": self.sign,
             "account_id": self.account_id,
             "access_token": self.access_token,
             "config": self.config.to_dict(),
@@ -117,6 +120,7 @@ class Credentials:
     @classmethod
     def from_dict(cls, data: Dict) -> "Credentials":
         return cls(
+            sign=data.get("sign"),
             account_id=data.get("account_id"),
             access_token=data.get("access_token"),
             config=EbinexConfig.from_dict(data.get("config", {})),
