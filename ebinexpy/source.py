@@ -212,11 +212,12 @@ class Ebinex:
             def ping_interval():
                 last_ping = time.time()
                 while self.connected:
-                    next_ping = last_ping+10
+                    print(self.connected)
+                    next_ping = last_ping + 10
                     current_ping = time.time()
         
                     if current_ping < next_ping:
-                        time.sleep(next_ping-current_ping)
+                        time.sleep(next_ping - current_ping)
 
                     payload = f'["{Sigma.LF}"]'
                     client.ws.send(payload)
@@ -329,7 +330,9 @@ class Ebinex:
 
     @property
     def environment(self):
-        return self.account.environment
+        if not isinstance(self.config, tp.EbinexConfig):
+            return self.account.environment
+        return self.config.environment
 
     @property
     def symbol(self) -> str:
