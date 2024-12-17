@@ -323,7 +323,7 @@ class EbinexTrade:
 
 class EbinexConfig:
     def __init__(
-        self, symbol: str, timeframe: Timeframe, environment: Union[Environment, str]
+        self, symbol: str, timeframe: Timeframe, environment: Environment
     ):
         self.symbol = symbol
         self.timeframe = timeframe
@@ -331,13 +331,9 @@ class EbinexConfig:
 
     def to_dict(self) -> Dict[str, str]:
         return {
-            "timeframe": self.timeframe.name,
             "symbol": self.symbol,
-            "environment": (
-                self.environment
-                if isinstance(self.environment, str)
-                else self.environment.name
-            ),
+            "timeframe": self.timeframe.name,            
+            "environment": self.environment.name,
         }
 
     @classmethod

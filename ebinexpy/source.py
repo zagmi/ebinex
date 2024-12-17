@@ -25,8 +25,6 @@ from strings import Events, URLs
 
 class Ebinex:
     def __init__(self, email: str, password: str, keep=False, **kwargs) -> None:
-        atexit.register(self.close)
-
         if not isinstance(email, str) or not isinstance(password, str):
             errors = []
             if not isinstance(email, str):
@@ -41,18 +39,33 @@ class Ebinex:
 
         self.account_id: Union[str, None] = None
         self.access_token: Union[str, None] = None
+        self.config: tp.EbinexConfig = kwargs.get("config")
+
+        def clapback():
+            """Ignore me, what I do doesn't matter to you"""
+            credentials = tp.Credentials(
+                sign=self.security.sign(self.email),
+                access_token=self.access_token,
+                account_id=self.account_id,
+                config=tp.EbinexConfig(
+                    symbol=self.symbol,
+                    timeframe=self.timeframe,
+                    environment=self.environment,
+                ),
+            )
+
+            self.security.save_credentials(self.email, **credentials.to_dict())
 
         self.book: tp.EbinexBook
         self.subs: Dict[str, str] = {}
         self.balance: tp.EbinexWebSocketBalance
         self.ords: Dict[str, tp.EbinexOrder] = {}
         self.trades: Dict[str, List[tp.EbinexTrade]] = {}
+        atexit.register(lambda: clapback() if (self.keep and self.connected) else None)
 
         self.urls = URLs()
-        self.lyap = time.time()
         self.signals = Signals()
         self.requests = requests.Session()
-        self.config: tp.EbinexConfig = kwargs.get("config")
         self.security = Security(kwargs.get("vault", tp.DEFAULT_VAULT))
 
         logger = kwargs.get("logger")
@@ -124,10 +137,7 @@ class Ebinex:
         if account_id and access_token:
             self.account_id = account_id
             self.access_token = access_token
-
-            if self.keep:
-                self.clapback()
-
+            self.config = tp.EbinexConfig(symbol=self.symbol, timeframe=self.timeframe, environment=self.environment)
         try:
             assert access_token is not None
         except AssertionError as ext:
@@ -200,12 +210,17 @@ class Ebinex:
                     self.subs[sub_id] = destination
 
             def ping_interval():
-                for i in itertools.count():
-                    cyap = time.time()
-                    if cyap - self.lyap >= 10:
-                        payload = f'["{Sigma.LF}"]'
-                        client.ws.send(payload)
-                        self.lyap = cyap
+                last_ping = time.time()
+                while self.stomp.connected.is_set():
+                    next_ping = last_ping+10
+                    current_ping = time.time()
+        
+                    if current_ping < next_ping:
+                        time.sleep(next_ping-current_ping)
+
+                    payload = f'["{Sigma.LF}"]'
+                    client.ws.send(payload)
+                    last_ping = time.time()
 
             ptr = threading.Thread(target=ping_interval)
             ptr.name = nameof(ping_interval)
@@ -397,7 +412,7 @@ class Ebinex:
             self.subs[sub_id] = destination
 
         self.signals.trade.get()
-        setattr(self.config, nameof(self.symbol), symbol)
+        setattr(self.config, nameof(symbol), symbol)
 
     def change_timeframe(self, timeframe: tp.Timeframe):
         if timeframe == self.timeframe:
@@ -420,7 +435,7 @@ class Ebinex:
         while timeframe != self.book.timeframe:
             self.signals.book.get()                
 
-        setattr(self.config, nameof(self.timeframe), timeframe)
+        setattr(self.config, nameof(timeframe), timeframe)
 
     def change_environment(self, environment: tp.Environment):
         if environment == self.environment:
@@ -442,7 +457,7 @@ class Ebinex:
             self.subs[sub_id] = destination
 
         self.signals.balance.get()
-        setattr(self.config, nameof(self.environment), environment)
+        setattr(self.config, nameof(environment), environment)
 
     def orders(
         self,
@@ -494,24 +509,6 @@ class Ebinex:
         
         return [tp.EbinexPriceData.from_dict(data) for data in response.json()]
 
-    def clapback(self):
-        """Ignore me, what I do doesn't matter to you"""
-        credentials = tp.Credentials(
-            sign=self.security.sign(self.email),
-            access_token=self.access_token,
-            account_id=self.account_id,
-            config=tp.EbinexConfig(
-                symbol=self.symbol,
-                timeframe=self.timeframe,
-                environment=self.environment,
-            ),
-        )
-
-        self.security.save_credentials(self.email, **credentials.to_dict())
-
-    def close(self):
-        try:
-            self.clapback()
-            self.stomp.ws.close()
-        except AttributeError:
-            pass
+    def logout(self):
+        if self.connected: self.stomp.ws.close()        
+        if self.keep: os.remove(tp.DEFAULT_VAULT)

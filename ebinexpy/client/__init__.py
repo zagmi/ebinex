@@ -68,9 +68,7 @@ class StompClient:
         self.on_error = on_error
         self.on_message = on_message
 
-        self.on_connected: Callable[[StompClient]] = kwargs.get(
-            "on_connected", DEFAULT_FUNC
-        )
+        self.on_connected: Callable[[StompClient]] = kwargs.get("on_connected", DEFAULT_FUNC)
 
         self.connected = threading.Event()
         self.subscriptions: Dict[str, Callable] = {}
