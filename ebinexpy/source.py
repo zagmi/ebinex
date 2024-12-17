@@ -511,4 +511,5 @@ class Ebinex:
 
     def logout(self):
         if self.connected: self.stomp.ws.close()        
-        if self.keep: os.remove(tp.DEFAULT_VAULT)
+        if self.keep and os.path.exists(tp.DEFAULT_VAULT):
+            os.remove(tp.DEFAULT_VAULT)
