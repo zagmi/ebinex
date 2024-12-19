@@ -211,7 +211,7 @@ class Ebinex:
 
             def ping_interval():
                 last_ping = time.time()
-                while self.connected:
+                while self.stomp.connected.is_set():
                     next_ping = last_ping + 10
                     current_ping = time.time()
         

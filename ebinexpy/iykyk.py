@@ -153,8 +153,9 @@ class EbinexBook:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "EbinexBook":
-        bull_investments = [EbinexBook.Investment.from_dict(b) for b in data["bull"]]
-        bear_investments = [EbinexBook.Investment.from_dict(b) for b in data["bear"]]
+        bull_investments = [EbinexBook.Investment.from_dict(b) for b in (data.get("bull") or [])]
+        bear_investments = [EbinexBook.Investment.from_dict(b) for b in (data.get("bear") or [])]
+
         return cls(
             timeframe=Timeframe[data["candleTimeFrame"]],
             symbol=data["symbol"],
