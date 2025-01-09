@@ -111,6 +111,7 @@ class Ebinex:
                     pass
 
                 options = DriverOpts()
+                options.add_argument("--lang=en")
                 options.add_argument("--incognito")
                 options.add_argument("--no-sandbox")
                 options.add_argument("--headless=new")
@@ -385,12 +386,21 @@ class Ebinex:
         body = self.stomp.dumpy(payload)
         self.stomp.send("/topic/execute", body=body, headers={"content-length": 144})
 
+        created_at = time.time()
         order: tp.EbinexOrder = self.signals.order.get()
+        while time.time() - created_at < 10:
+            if order.created_at and (time.time() - order.created_at >= 10):
+                break
+            order = self.signals.order.get()
 
         def wait(until: List[tp.Statuses] = [tp.Statuses.OPEN]):
-            while not any(self.ords[order.id].status == status for status in until):
+            while True:
                 cap_order = self.ords.get(order.id)
-            order.update(cap_order)
+                if cap_order and cap_order.id == order.id:
+                    order.update(cap_order)
+                    if any(order.status == status for status in until):
+                        break
+                time.sleep(0.1)
 
         return order, wait
 
