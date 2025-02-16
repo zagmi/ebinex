@@ -14,4 +14,4 @@ except pkg_resources.DistributionNotFound:
     __version__ = "0.0.0"
 
 from source import Ebinex
-__all__ = [Ebinex]
+__all__ = ["Ebinex", "__version__"]

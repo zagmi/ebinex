@@ -1,16 +1,17 @@
 """if you know, you know, types basically"""
 
 import os
+import sys
 from enum import Enum, auto
 from selenium.webdriver import Chrome
 from datetime import datetime, timedelta
 from selenium.common.exceptions import NoSuchElementException as NSEE
-from typing import Union, Optional, Any, Dict, List, Callable, TYPE_CHECKING
+from typing import Any, Dict, List, Callable, Optional, TYPE_CHECKING
 
 WebDriver = Chrome
 NoSuchElementException = NSEE
 
-PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+PACKAGE_DIR = os.path.dirname(sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(__file__))
 DEFAULT_FUNC: Callable[..., None] = lambda *args, **kwargs: None
 
 DEFAULT_VAULT = os.path.join(PACKAGE_DIR, "vault.json")

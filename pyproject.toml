@@ -18,10 +18,10 @@ dependencies = [
     "PyJWT",
     "numpy",
     "pywin32",
-    "varname",
     "selenium",
     "requests",
     "openai-whisper",
+    "varname<=0.13.5",       
     "websocket-client"
 ]
 

@@ -31,6 +31,7 @@ class Ebinex:
                 errors.append(nameof(email))
             if not isinstance(password, str):
                 errors.append(nameof(password))
+            if len(errors) > 0:
                 raise AttributeError(f'It\'s like they\'re missing that spark or something: {", ".join(errors)}')
 
         self.email = email
@@ -118,7 +119,7 @@ class Ebinex:
                 options.add_argument("--disable-dev-shm-usage")
                 options.add_argument(f"user-agent={UserAgent.random()}")
                 service = DriverService(executable_path=executable_path)
-                driver = WebDriver(options=options, keep_alive=True)
+                driver = WebDriver(options=options, service=service, keep_alive=True)
 
                 driver.get(self.urls.login)
                 WebDriverWait(driver, 10).until(lambda d: "Entrar" in d.page_source)

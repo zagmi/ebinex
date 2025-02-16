@@ -3,12 +3,12 @@ import hashlib
 import jwt, json
 import time, base64
 from win32 import win32crypt
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 from iykyk import Credentials, EbinexConfig, DEFAULT_VAULT
 
 
 class Security:
-    def __init__(self, vault=DEFAULT_VAULT):
+    def __init__(self, vault: str = DEFAULT_VAULT):
         self.vault = vault
 
     def encrypt_data(self, data: str):
