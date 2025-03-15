@@ -4,7 +4,7 @@ import jwt, json
 import time, base64
 from win32 import win32crypt
 from typing import Any, Dict, Optional
-from iykyk import Credentials, EbinexConfig, DEFAULT_VAULT
+from ebinexpy.iykyk import Credentials, EbinexConfig, DEFAULT_VAULT
 
 
 class Security:

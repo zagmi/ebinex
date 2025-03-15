@@ -1,6 +1,7 @@
 import logging
 from functools import wraps
 from difflib import SequenceMatcher
+from datetime import datetime, timedelta
 from typing import overload, Union, List, Tuple
 
 
@@ -29,6 +30,14 @@ def llke(
     similarity = SequenceMatcher(None, x, y).ratio()
     return similarity >= threshold
 
+def updated_timestamp(date: datetime = None, minutes: int = 0) -> int:
+    if date is None:
+        return int(datetime.now().timestamp() * 1000)
+
+    updated_date = date + timedelta(minutes=minutes)
+    updated_date = updated_date.replace(second=0, microsecond=0)
+
+    return int(updated_date.timestamp() * 1000)
 
 def sockthis(func):
     """Too much rizz, only handles important logs"""

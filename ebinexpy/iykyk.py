@@ -5,13 +5,14 @@ import sys
 from enum import Enum, auto
 from selenium.webdriver import Chrome
 from datetime import datetime, timedelta
+from dataclasses import dataclass, field
 from selenium.common.exceptions import NoSuchElementException as NSEE
 from typing import Any, Dict, List, Callable, Optional, TYPE_CHECKING
 
 WebDriver = Chrome
 NoSuchElementException = NSEE
 
-PACKAGE_DIR = os.path.dirname(sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(__file__))
+PACKAGE_DIR = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
 DEFAULT_FUNC: Callable[..., None] = lambda *args, **kwargs: None
 
 DEFAULT_VAULT = os.path.join(PACKAGE_DIR, "vault.json")
@@ -27,6 +28,18 @@ class Direction(Enum):
     BULL = auto()
     BEAR = auto()
 
+    def __eq__(self, other: Optional["Direction"]):
+        if hasattr(other, "name"):
+            return self.name == other.name
+        return NotImplemented
+
+    def __ne__(self, other: Optional["Direction"]):
+        if hasattr(other, "name"):
+            return self.name != other.name
+        return NotImplemented
+
+class BinaryOrderType(Enum):
+    OPTION = auto()
 
 class Timeframe(Enum):
     M1 = 1
@@ -94,20 +107,13 @@ class Environment(Enum):
             return self.name != other.name
         return NotImplemented
 
+@dataclass
 class Credentials:
-    def __init__(
-        self,
-        sign: str,
-        account_id: str,
-        access_token: str,
-        config: "EbinexConfig",
-        expiration=DEFAULT_EXPIRATION,
-    ):
-        self.sign = sign    
-        self.account_id = account_id
-        self.access_token = access_token
-        self.config = config
-        self.expiration = expiration
+    sign: str
+    account_id: str
+    access_token: str
+    config: "EbinexConfig"
+    expiration: int = field(default=DEFAULT_EXPIRATION)
 
     def to_dict(self) -> Dict:
         return {
@@ -125,9 +131,8 @@ class Credentials:
             account_id=data.get("account_id"),
             access_token=data.get("access_token"),
             config=EbinexConfig.from_dict(data.get("config", {})),
-            expiration=data.get("expiration"),
+            expiration=data.get("expiration", DEFAULT_EXPIRATION),
         )
-
 
 class EbinexBook:
     class Investment:
@@ -165,65 +170,35 @@ class EbinexBook:
         )
 
 
+@dataclass
 class EbinexOrder:
-    def __init__(
-        self,
-        id: str,
-        user_email: str,
-        account_id: str,
-        environment: Environment,
-        candle_time_frame: str,
-        candle_start_time: int,
-        symbol: str,
-        direction: str,
-        price: float,
-        cop: float,
-        ccp: float,
-        asset: str,
-        invest: float,
-        fee_rate: float,
-        used_bonus: float,
-        fees: float,
-        refund: float,
-        accept: float,
-        profit: float,
-        loss: float,
-        platform_liquidity: float,
-        status: Statuses,
-        referral_id: Optional[str],
-        referral_commission: Optional[float],
-        created_at: int,
-        created_at_broker_time: int,
-        influencer_order: bool,
-    ):
-
-        self.id = id
-        self.user_email = user_email
-        self.account_id = account_id
-        self.environment = environment
-        self.candle_time_frame = candle_time_frame
-        self.candle_start_time = candle_start_time
-        self.symbol = symbol
-        self.direction = direction
-        self.price = price
-        self.cop = cop
-        self.ccp = ccp
-        self.asset = asset
-        self.invest = invest
-        self.fee_rate = fee_rate
-        self.used_bonus = used_bonus
-        self.fees = fees
-        self.refund = refund
-        self.accept = accept
-        self.profit = profit
-        self.loss = loss
-        self.platform_liquidity = platform_liquidity
-        self.status = status
-        self.referral_id = referral_id
-        self.referral_commission = referral_commission
-        self.created_at = created_at
-        self.created_at_broker_time = created_at_broker_time
-        self.influencer_order = influencer_order
+    id: str
+    user_email: str
+    account_id: str
+    environment: 'Environment'
+    candle_time_frame: str
+    candle_start_time: int
+    symbol: str
+    direction: str
+    price: float
+    cop: float
+    ccp: float
+    asset: str
+    invest: float
+    fee_rate: float
+    used_bonus: float
+    fees: float
+    refund: float
+    accept: float
+    profit: float
+    loss: float
+    platform_liquidity: float
+    status: 'Statuses'
+    referral_id: Optional[str] = None
+    referral_commission: Optional[float] = None
+    created_at: int = field(default_factory=int)
+    created_at_broker_time: int = field(default_factory=int)
+    influencer_order: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -292,29 +267,24 @@ class EbinexOrder:
         self.__dict__.update(other.__dict__)
 
 
+@dataclass
 class EbinexTrade:
-    def __init__(
-        self,
-        account_id: str,
-        timeframe: Timeframe,
-        symbol: str,
-        direction: Direction,
-        amount: int,
-        asset: str,
-        price: float,
-    ):
-        self.account_id = account_id
-        self.timeframe = timeframe
-        self.symbol = symbol
-        self.direction = direction
-        self.amount = amount
-        self.asset = asset
-        self.price = price
+    binary_order_type: BinaryOrderType
+    candle_end_time: int
+    account_id: str
+    timeframe: Timeframe
+    symbol: str
+    direction: Direction
+    amount: int
+    asset: str
+    price: float
 
     def to_dict(self) -> Dict:
         return {
+            "binaryOrderType": self.binary_order_type.name,
             "accountId": self.account_id,
             "candleTimeFrame": self.timeframe.name,
+            "candleEndTime": self.candle_end_time,
             "symbol": self.symbol,
             "direction": self.direction.name,
             "invest": self.amount,
@@ -323,18 +293,16 @@ class EbinexTrade:
         }
 
 
+@dataclass
 class EbinexConfig:
-    def __init__(
-        self, symbol: str, timeframe: Timeframe, environment: Environment
-    ):
-        self.symbol = symbol
-        self.timeframe = timeframe
-        self.environment = environment
+    symbol: str
+    timeframe: "Timeframe"
+    environment: "Environment"
 
     def to_dict(self) -> Dict[str, str]:
         return {
             "symbol": self.symbol,
-            "timeframe": self.timeframe.name,            
+            "timeframe": self.timeframe.name,
             "environment": self.environment.name,
         }
 
@@ -417,26 +385,16 @@ class EbinexAccount:
         )
 
 
+@dataclass
 class EbinexPriceData:
-    def __init__(
-        self,
-        timestamp: int,
-        open: float,
-        high: float,
-        low: float,
-        close: float,
-        n: Optional[int] = None,
-        v: Optional[float] = None,
-        vw: Optional[float] = None,
-    ):
-        self.timestamp = timestamp
-        self.open = open
-        self.high = high
-        self.low = low
-        self.close = close
-        self.n = n
-        self.v = v
-        self.vw = vw
+    timestamp: int
+    open: float
+    high: float
+    low: float
+    close: float
+    n: Optional[int] = None
+    v: Optional[float] = None
+    vw: Optional[float] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "EbinexPriceData":
@@ -589,11 +547,11 @@ class EbinexWebSocketInfo:
         return self.data.get("websocket")
 
 
+@dataclass
 class EbinexWebSocketTrade:
-    def __init__(self, timestamp: int, volume: float, price: float):
-        self.timestamp = timestamp
-        self.volume = volume
-        self.price = price
+    timestamp: int
+    volume: float
+    price: float
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "EbinexWebSocketTrade":

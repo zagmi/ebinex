@@ -1,7 +1,7 @@
 import whisper
 import os, time, requests
 from selenium.webdriver.common.by import By
-from iykyk import WebDriver, NoSuchElementException
+from ebinexpy.iykyk import WebDriver, NoSuchElementException
 
 
 class Captcha:

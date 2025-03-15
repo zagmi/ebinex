@@ -2,15 +2,7 @@ import re
 import json
 import threading
 import websocket
-from typing import (
-    Any,
-    List,
-    Dict,
-    Union,
-    overload,
-    Callable,
-    Optional,
-)
+from typing import *
 
 from .frame import Frame
 from .constants import (
@@ -70,6 +62,7 @@ class StompClient:
 
         self.on_connected: Callable[[StompClient]] = kwargs.get("on_connected", DEFAULT_FUNC)
 
+        self.headers = cast(Dict, kwargs.get("header", {}))
         self.connected = threading.Event()
         self.subscriptions: Dict[str, Callable] = {}
 
@@ -98,7 +91,7 @@ class StompClient:
 
         self.ws = websocket.WebSocketApp(
             self.url,
-            header=kwargs.get("header"),
+            header=self.headers,
             on_message=_on_message,
             on_error=_on_error,
             on_close=_on_close,
@@ -110,13 +103,32 @@ class StompClient:
         app.daemon = True
         app.start()
 
-    def connect(self, headers: Dict = {}):
+    def connect(self, headers: Dict = {}):        
         self.connected.wait()
 
         headers[HDR_ACCEPT_VERSION] = VERSION
         headers[HDR_HEARTBEAT] = HEARTBEAT
 
         self._transmit(CMD_CONNECT, headers)
+
+    def reconnect(self, headers: Optional[Dict] = None):
+        self.connected.clear()
+
+        self.ws = websocket.WebSocketApp(
+            self.url,
+            header=self.headers,
+            on_message=self.ws.on_message,
+            on_error=self.ws.on_error,
+            on_close=self.ws.on_close,
+            on_open=self.ws.on_open,
+        )
+
+        app = threading.Thread(target=self.ws.run_forever, kwargs={"suppress_origin": True})
+        app.name = nameof(StompClient)
+        app.daemon = True
+        app.start()
+
+        self.connected.wait()
 
     def disconnect(self, headers: Dict = {}):
         self._transmit(CMD_DISCONNECT, headers)
@@ -185,7 +197,11 @@ class StompClient:
         return chunks[0] if len(chunks) == 1 else chunks
 
     def dumpy(self, data: Dict):
-        return json.dumps(data).replace(" ", "").replace('"', r"\"").strip()
+        return self.stripper(data).replace('"', r"\"").strip()
 
-    def _transmit(self, command, headers, body=None):
+    def stripper(self, data: Dict):
+        return json.dumps(data).replace(" ", "")
+
+    def _transmit(self, command, headers, body=""):
         self.ws.send(f'["{Frame.marshall(command, headers, body)}"]')
+        

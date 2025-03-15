@@ -1,26 +1,22 @@
 import copy
-import itertools
 import threading
 import numpy as np
 import urllib.parse
-import os, base64, time
 import atexit, requests
-from typing import (
-    Any,
-    Dict,
-    List,
-    Tuple,
-    Union,
-    Callable,
-)
+import os, base64, time
 
-import iykyk as tp
+from typing import *
+from datetime import datetime
+
 from varname import nameof
-from signals import Signals
-from security import Security
-from utils import llke, sockthis
-from user_agent import UserAgent
-from strings import Events, URLs
+
+import ebinexpy.iykyk as tp
+import ebinexpy.utils as utils
+
+from ebinexpy.signals import Signals
+from ebinexpy.security import Security
+from ebinexpy.strings import Events, URLs
+from ebinexpy.user_agent import UserAgent
 
 
 class Ebinex:
@@ -62,15 +58,13 @@ class Ebinex:
         self.balance: tp.EbinexWebSocketBalance
         self.ords: Dict[str, tp.EbinexOrder] = {}
         self.trades: Dict[str, List[tp.EbinexTrade]] = {}
-        atexit.register(lambda: clapback() if (self.keep and self.connected) else None)
 
         self.urls = URLs()
         self.signals = Signals()
         self.requests = requests.Session()
         self.security = Security(kwargs.get("vault", tp.DEFAULT_VAULT))
 
-        logger = kwargs.get("logger")
-        if not logger:
+        if not kwargs.get("logger"):
             log_dir = os.path.join(tp.PACKAGE_DIR, "logs")
             if not os.path.exists(log_dir):
                 os.makedirs(log_dir)
@@ -87,29 +81,35 @@ class Ebinex:
                 level=logging.INFO,
             )
 
+        import winreg
+        from ebinexpy.captcha import Captcha
+        from selenium.webdriver import Chrome as WebDriver
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.chrome.options import Options as DriverOpts
+        from selenium.webdriver.chrome.service import Service as DriverService
+
+        try:
+            registry_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, registry_path) as key:
+                executable_path, _ = winreg.QueryValueEx(key, "")
+        except FileNotFoundError:
+            pass
+        
         sign = self.security.sign(self.email)
         credentials = self.security.load_credentials(sign)
         if credentials:
             account_id = credentials.account_id
             access_token = credentials.access_token
             self.config = self.config or credentials.config
-
         else:
             try:
                 import winreg
-                from captcha import Captcha
+                from ebinexpy.captcha import Captcha
                 from selenium.webdriver.common.by import By
                 from selenium.webdriver import Chrome as WebDriver
                 from selenium.webdriver.support.ui import WebDriverWait
                 from selenium.webdriver.chrome.options import Options as DriverOpts
                 from selenium.webdriver.chrome.service import Service as DriverService
-
-                try:
-                    registry_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"
-                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, registry_path) as key:
-                        executable_path, _ = winreg.QueryValueEx(key, "")
-                except FileNotFoundError:
-                    pass
 
                 options = DriverOpts()
                 options.add_argument("--lang=en")
@@ -119,9 +119,9 @@ class Ebinex:
                 options.add_argument("--disable-dev-shm-usage")
                 options.add_argument(f"user-agent={UserAgent.random()}")
                 service = DriverService(executable_path=executable_path)
-                driver = WebDriver(options=options, service=service, keep_alive=True)
-
+                driver = WebDriver(options=options, service=None)
                 driver.get(self.urls.login)
+
                 WebDriverWait(driver, 10).until(lambda d: "Entrar" in d.page_source)
                 driver.find_element(By.CSS_SELECTOR, 'input[type="email"]').send_keys(self.email)
                 driver.find_element(By.CSS_SELECTOR, 'input[type="password"]').send_keys(self.password)
@@ -182,7 +182,7 @@ class Ebinex:
             "Cache-Control": "no-cache",
             "Connection": "Upgrade",
             "Host": self.urls.ws_host,
-            "Origin": self.urls.originUrl,
+            "Origin": f"https://{self.urls.base_url}",
             "Pragma": "no-cache",
             "Sec-WebSocket-Key": websocket_key,
             "Sec-WebSocket-Version": "13",
@@ -190,8 +190,8 @@ class Ebinex:
             "User-Agent": UserAgent.random(),
         }
 
-        from client import StompClient
-        from client.frame import Sigma
+        from ebinexpy.client import StompClient
+        from ebinexpy.client.frame import Sigma
 
         def on_connected(client: StompClient):
             """Method to process websocket open"""
@@ -203,7 +203,8 @@ class Ebinex:
                 "/user/topic/{}".format(environment.name),
                 r"/topic/graph\\c{}".format(symbol),
                 r"/topic/book\\c{}\\c{}\\c{}".format(environment.name, symbol, timeframe.name),
-                "/topic/execute",
+                "/user/topic/execute",
+                "/user/topic/data"
             ]
 
             for index, destination in enumerate(destinations):
@@ -220,8 +221,7 @@ class Ebinex:
                     if current_ping < next_ping:
                         time.sleep(next_ping - current_ping)
 
-                    payload = f'["{Sigma.LF}"]'
-                    client.ws.send(payload)
+                    client.ws.send(f'["{Sigma.LF}"]')
                     last_ping = time.time()
 
             ptr = threading.Thread(target=ping_interval)
@@ -237,7 +237,7 @@ class Ebinex:
             """Method to process Stomp close"""
             pass
 
-        @sockthis
+        @utils.sockthis
         def on_message(client: StompClient, message: Union[Dict, List]):
             """Method to process Stomp messages"""
             if isinstance(message, dict):
@@ -266,7 +266,7 @@ class Ebinex:
                         self.ords[order.id] = order
                         self.signals.order.put(order)
 
-        @sockthis
+        @utils.sockthis
         def on_error(client: StompClient, error: str):
             """Method to process Stomp errors"""
             pass
@@ -280,11 +280,23 @@ class Ebinex:
             on_open=on_open,
             header=header,
         )
+
         """Use me if you know what you're doing, otherwise don't piss me off"""
 
+        def reconnector():
+            while True:
+                if not self.stomp.connected.is_set():
+                    self.stomp.reconnect()
+                time.sleep(5)
+
+        reconnector_thread = threading.Thread(target=reconnector)
+        reconnector_thread.daemon = True
+        reconnector_thread.start()
+        
         self.stomp.connect()
         self.signals.trade.get()
-        self.signals.balance.get()
+
+        atexit.register(lambda: clapback() if (self.keep and self.connected) else None)
 
     @property
     def connected(self) -> bool:
@@ -298,7 +310,7 @@ class Ebinex:
             "t": int(time.time() * 1000),
         }
 
-        response = self.requests.get(self.urls.wsInfo, params=params)
+        response = self.requests.get(self.urls.ws_info, params=params)
         alive_token = tp.EbinexWebSocketInfo(response.json()).websocket
         return alive_token and self.stomp.connected.is_set()
 
@@ -312,7 +324,7 @@ class Ebinex:
 
     @property
     def account(self):
-        response = self.requests.get(self.urls.listAccounts, headers=self.headers)
+        response = self.requests.get(self.urls.list_accounts, headers=self.headers)
         for account in response.json():
             environment = getattr(self.config, "environment", tp.Environment.TEST)
             if account.get("environment") == environment.name:
@@ -321,7 +333,7 @@ class Ebinex:
 
     @property
     def symbols(self):
-        response = self.requests.get(self.urls.availableSymbols, headers=self.headers)
+        response = self.requests.get(self.urls.available_symbols, headers=self.headers)
         return [tp.EbinexSymbol.from_dict(symbol) for symbol in response.json()]
 
     @property
@@ -347,9 +359,22 @@ class Ebinex:
             return self.parameters.default_candle_timeframe
         return self.config.timeframe
 
-    def order(
-        self, amount: int, direction: tp.Direction
-    ) -> Tuple[tp.EbinexOrder, Callable[[List[tp.Statuses]], None]]:
+    @property
+    def server_time(self):
+        start = int(time.time() * 1000)
+        response = self.requests.get(f"https://{self.urls.api_base_url}/orders/getBrokerTimestamp?symbol={self.symbol}", headers=self.headers)
+        broker_timestamp = int(response.text)
+        end = int(time.time() * 1000)
+        request_time = end - start
+        now_time = broker_timestamp + int(request_time / 2)
+
+        return int(time.time() * 1000) - now_time
+
+    @property
+    def broker_now_time(self) -> int:
+        return int(time.time() * 1000) - self.server_time
+
+    def order(self, order_type: tp.BinaryOrderType, amount: int, direction: tp.Direction) -> Tuple[tp.EbinexOrder, Callable[[List[tp.Statuses]], None]]:
         """
         Places an order for a specified amount and direction.
 
@@ -367,15 +392,18 @@ class Ebinex:
             - A function that waits for the order status to match specified statuses.
         """
         trades = self.trades.get(self.symbol)
-        asset = self.balance.asset.upper()
+        candle_end_time = utils.updated_timestamp(datetime.fromtimestamp(self.broker_now_time / 1000), 1)
+        asset = self.parameters.default_coin
         account_id = self.account.id
         timeframe = self.timeframe
         last_trade = trades[-1]
         symbol = self.symbol
 
         opts = tp.EbinexTrade(
+            binary_order_type=order_type,
             account_id=account_id,
-            price=round(last_trade.price, 3),
+            price=round(last_trade.price, 4),
+            candle_end_time=candle_end_time,
             timeframe=timeframe,
             direction=direction,
             symbol=symbol,
@@ -385,7 +413,7 @@ class Ebinex:
 
         payload = opts.to_dict()
         body = self.stomp.dumpy(payload)
-        self.stomp.send("/topic/execute", body=body, headers={"content-length": 144})
+        self.stomp.send("/user/topic/execute", body=body)
 
         created_at = time.time()
         order: tp.EbinexOrder = self.signals.order.get()
@@ -416,7 +444,7 @@ class Ebinex:
 
         for destination in destinations:
             for key, value in copy.deepcopy(self.subs).items():
-                if llke(destination, value):
+                if utils.llke(destination, value):
                     self.stomp.unsubscribe(key)
                     del self.subs[key]
 
@@ -437,7 +465,7 @@ class Ebinex:
 
         for destination in destinations:
             for key, value in copy.deepcopy(self.subs).items():
-                if llke(destination, value):
+                if utils.llke(destination, value):
                     self.stomp.unsubscribe(key)
                     del self.subs[key]
 
@@ -461,7 +489,7 @@ class Ebinex:
         
         for destination in destinations:
             for key, value in copy.deepcopy(self.subs).items():
-                if llke(destination, value):
+                if utils.llke(destination, value):
                     self.stomp.unsubscribe(key)
                     del self.subs[key]
 
@@ -517,7 +545,7 @@ class Ebinex:
             "limit": limit,
         }
 
-        url = f"{self.urls.aggregatedTrades}?{urllib.parse.urlencode(params)}"
+        url = f"{self.urls.aggregated_trades}?{urllib.parse.urlencode(params)}"
         response = self.requests.get(url, headers=self.headers)
         
         return [tp.EbinexPriceData.from_dict(data) for data in response.json()]
