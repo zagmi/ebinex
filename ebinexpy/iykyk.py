@@ -2,12 +2,13 @@
 
 import os
 import sys
+import json
 from enum import Enum, auto
 from selenium.webdriver import Chrome
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from selenium.common.exceptions import NoSuchElementException as NSEE
-from typing import Any, Dict, List, Callable, Optional, Protocol, TYPE_CHECKING
+from typing import Any, Dict, List, Callable, Optional, TYPE_CHECKING
 
 WebDriver = Chrome
 NoSuchElementException = NSEE
@@ -422,113 +423,63 @@ class EbinexPriceData:
         )
 
 
+@dataclass
 class EbinexParameters:
-    def __init__(
-        self,
-        fee_rate: str,
-        withdrawal_percentual_fee_rate: str,
-        candle_time_frames: List[Dict[str, str]],
-        default_coin: str,
-        public_api_url: str,
-        user_registration_on_hold: bool,
-        liquidity_user_active: bool,
-        default_referral_percentual_commission: float,
-        liquidity_user_max_liquidity: float,
-        kyc_enabled: bool,
-        randomized_book: Dict[str, Any],
-        liquidity_user_max_liquidity_per_user: float,
-        scoped_randomized_book: List[Dict[str, Any]],
-        automatic_withdrawal_config: Dict[str, Any],
-        dynamic_rlp_parameters: Dict[str, Any],
-        default_gateway_deposit: str,
-        default_gateway_withdrawal: str,
-        symbols_config: Dict[str, Any],
-        user_language: str,
-        user_timezone: str,
-        default_operation_qty: float,
-        default_candle_timeframe: Timeframe,
-        default_symbol: str,
-        withdrawal_min_amount: float,
-    ):
-
-        self.fee_rate = fee_rate
-        self.withdrawal_percentual_fee_rate = withdrawal_percentual_fee_rate
-        self.candle_time_frames = candle_time_frames
-        self.default_coin = default_coin
-        self.public_api_url = public_api_url
-        self.user_registration_on_hold = user_registration_on_hold
-        self.liquidity_user_active = liquidity_user_active
-        self.default_referral_percentual_commission = default_referral_percentual_commission
-        self.liquidity_user_max_liquidity = liquidity_user_max_liquidity
-        self.kyc_enabled = kyc_enabled
-        self.randomized_book = randomized_book
-        self.liquidity_user_max_liquidity_per_user = liquidity_user_max_liquidity_per_user
-        self.scoped_randomized_book = scoped_randomized_book
-        self.automatic_withdrawal_config = automatic_withdrawal_config
-        self.dynamic_rlp_parameters = dynamic_rlp_parameters
-        self.default_gateway_deposit = default_gateway_deposit
-        self.default_gateway_withdrawal = default_gateway_withdrawal
-        self.symbols_config = symbols_config
-        self.user_language = user_language
-        self.user_timezone = user_timezone
-        self.default_operation_qty = default_operation_qty
-        self.default_candle_timeframe = default_candle_timeframe
-        self.default_symbol = default_symbol
-        self.withdrawal_min_amount = withdrawal_min_amount
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "fee_rate": self.fee_rate,
-            "withdrawal_percentual_fee_rate": self.withdrawal_percentual_fee_rate,
-            "candle_time_frames": self.candle_time_frames,
-            "default_coin": self.default_coin,
-            "public_api_url": self.public_api_url,
-            "user_registration_on_hold": self.user_registration_on_hold,
-            "liquidity_user_active": self.liquidity_user_active,
-            "default_referral_percentual_commission": self.default_referral_percentual_commission,
-            "liquidity_user_max_liquidity": self.liquidity_user_max_liquidity,
-            "kyc_enabled": self.kyc_enabled,
-            "randomized_book": self.randomized_book,
-            "liquidity_user_max_liquidity_per_user": self.liquidity_user_max_liquidity_per_user,
-            "scoped_randomized_book": self.scoped_randomized_book,
-            "automatic_withdrawal_config": self.automatic_withdrawal_config,
-            "dynamic_rlp_parameters": self.dynamic_rlp_parameters,
-            "default_gateway_deposit": self.default_gateway_deposit,
-            "default_gateway_withdrawal": self.default_gateway_withdrawal,
-            "symbols_config": self.symbols_config,
-            "user_language": self.user_language,
-            "user_timezone": self.user_timezone,
-            "default_operation_qty": self.default_operation_qty,
-            "default_candle_timeframe": self.default_candle_timeframe,
-            "default_symbol": self.default_symbol,
-            "withdrawal_min_amount": self.withdrawal_min_amount,
-        }
+    fee_rate: str
+    withdrawal_percentual_fee_rate: str
+    candle_time_frames: List[Dict[str, str]]
+    default_coin: str
+    public_api_url: str
+    user_registration_on_hold: bool
+    liquidity_user_active: bool
+    default_referral_percentual_commission: float
+    liquidity_user_max_liquidity: float
+    kyc_enabled: bool
+    randomized_book: Dict[str, Any]
+    liquidity_user_max_liquidity_per_user: float
+    scoped_randomized_book: List[Dict[str, Any]]
+    automatic_withdrawal_config: Dict[str, Any]
+    dynamic_rlp_parameters: Dict[str, Any]
+    default_gateway_deposit: str
+    default_gateway_withdrawal: str
+    symbols_config: Dict[str, "SymbolConfig"]
+    user_language: str
+    user_timezone: str
+    default_operation_qty: float
+    default_candle_timeframe: Timeframe
+    default_symbol: str
+    withdrawal_min_amount: float
 
     @classmethod
     def from_list(cls, data: List[Dict[str, Any]]) -> "EbinexParameters":
-        import json
-
         data_dict = {item["key"]: item["value"] for item in data}
+
+        for key, value in data_dict.items():
+            if isinstance(value, str):
+                try:
+                    data_dict[key] = json.loads(value)
+                except (json.JSONDecodeError, TypeError):
+                    pass  
 
         return cls(
             fee_rate=data_dict.get("FEE_RATE"),
             withdrawal_percentual_fee_rate=data_dict.get("WITHDRAWAL_PERCENTUAL_FEE_RATE"),
-            candle_time_frames=json.loads(data_dict.get("CANDLE_TIME_FRAMES", "[]")),
+            candle_time_frames=data_dict.get("CANDLE_TIME_FRAMES", []),
             default_coin=data_dict.get("DEFAULT_COIN"),
             public_api_url=data_dict.get("PUBLIC_API_URL"),
-            user_registration_on_hold=data_dict.get("USER_REGISTRATION_ON_HOLD") == "true",
-            liquidity_user_active=data_dict.get("LIQUIDITY_USER_ACTIVE") == "true",
+            user_registration_on_hold=data_dict.get("USER_REGISTRATION_ON_HOLD"),
+            liquidity_user_active=data_dict.get("LIQUIDITY_USER_ACTIVE"),
             default_referral_percentual_commission=float(data_dict.get("DEFAULT_REFERRAL_PERCENTUAL_COMISSION", 0.0)),
             liquidity_user_max_liquidity=float(data_dict.get("LIQUIDITY_USER_MAX_LIQUIDITY", 0.0)),
-            kyc_enabled=data_dict.get("KYC_ENABLED") == "true",
-            randomized_book=json.loads(data_dict.get("RANDOMIZED_BOOK", "{}")),
+            kyc_enabled=data_dict.get("KYC_ENABLED"),
+            randomized_book=data_dict.get("RANDOMIZED_BOOK", {}),
             liquidity_user_max_liquidity_per_user=float(data_dict.get("LIQUIDITY_USER_MAX_LIQUIDITY_PER_USER", 0.0)),
-            scoped_randomized_book=json.loads(data_dict.get("SCOPED_RANDOMIZED_BOOK", "[]")),
-            automatic_withdrawal_config=json.loads(data_dict.get("AUTOMATIC_WITHDRAWAL_CONFIG", "{}")),
-            dynamic_rlp_parameters=json.loads(data_dict.get("DYNAMIC_RLP_PARAMETERS", "{}")),
+            scoped_randomized_book=data_dict.get("SCOPED_RANDOMIZED_BOOK", []),
+            automatic_withdrawal_config=data_dict.get("AUTOMATIC_WITHDRAWAL_CONFIG", {}),
+            dynamic_rlp_parameters=data_dict.get("DYNAMIC_RLP_PARAMETERS", {}),
             default_gateway_deposit=data_dict.get("DEFAULT_GATEWAY_DEPOSIT"),
             default_gateway_withdrawal=data_dict.get("DEFAULT_GATEWAY_WITHDRAWAL"),
-            symbols_config=json.loads(data_dict.get("SYMBOLS_CONFIG", "{}")),
+            symbols_config={key: SymbolConfig.from_dict(value) for key, value in data_dict.get("SYMBOLS_CONFIG", {}).items()},
             user_language=data_dict.get("USER_LANGUAGE"),
             user_timezone=data_dict.get("USER_TIMEZONE"),
             default_operation_qty=float(data_dict.get("DEFAULT_OPERATION_QTY", 0.0)),
@@ -536,6 +487,34 @@ class EbinexParameters:
             default_symbol=data_dict.get("DEFAULT_SYMBOL"),
             withdrawal_min_amount=float(data_dict.get("WITHDRAWAL_MIN_AMOUNT", 0.0)),
         )
+
+    def to_list(self) -> List[Dict[str, Any]]:
+        return [
+            {"key": "FEE_RATE", "value": self.fee_rate},
+            {"key": "WITHDRAWAL_PERCENTUAL_FEE_RATE", "value": self.withdrawal_percentual_fee_rate},
+            {"key": "CANDLE_TIME_FRAMES", "value": json.dumps(self.candle_time_frames)},
+            {"key": "DEFAULT_COIN", "value": self.default_coin},
+            {"key": "PUBLIC_API_URL", "value": self.public_api_url},
+            {"key": "USER_REGISTRATION_ON_HOLD", "value": self.user_registration_on_hold},
+            {"key": "LIQUIDITY_USER_ACTIVE", "value": self.liquidity_user_active},
+            {"key": "DEFAULT_REFERRAL_PERCENTUAL_COMMISSION", "value": self.default_referral_percentual_commission},
+            {"key": "LIQUIDITY_USER_MAX_LIQUIDITY", "value": self.liquidity_user_max_liquidity},
+            {"key": "KYC_ENABLED", "value": self.kyc_enabled},
+            {"key": "RANDOMIZED_BOOK", "value": json.dumps(self.randomized_book)}, 
+            {"key": "LIQUIDITY_USER_MAX_LIQUIDITY_PER_USER", "value": self.liquidity_user_max_liquidity_per_user},
+            {"key": "SCOPED_RANDOMIZED_BOOK", "value": json.dumps(self.scoped_randomized_book)},  
+            {"key": "AUTOMATIC_WITHDRAWAL_CONFIG", "value": json.dumps(self.automatic_withdrawal_config)}, 
+            {"key": "DYNAMIC_RLP_PARAMETERS", "value": json.dumps(self.dynamic_rlp_parameters)}, 
+            {"key": "DEFAULT_GATEWAY_DEPOSIT", "value": self.default_gateway_deposit},
+            {"key": "DEFAULT_GATEWAY_WITHDRAWAL", "value": self.default_gateway_withdrawal},
+            {"key": "SYMBOLS_CONFIG", "value": {key: value.to_dict() for key, value in self.symbols_config.items()}}, 
+            {"key": "USER_LANGUAGE", "value": self.user_language},
+            {"key": "USER_TIMEZONE", "value": self.user_timezone},
+            {"key": "DEFAULT_OPERATION_QTY", "value": self.default_operation_qty},
+            {"key": "DEFAULT_CANDLE_TIMEFRAME", "value": self.default_candle_timeframe.name if self.default_candle_timeframe else None},
+            {"key": "DEFAULT_SYMBOL", "value": self.default_symbol},
+            {"key": "WITHDRAWAL_MIN_AMOUNT", "value": self.withdrawal_min_amount},
+        ]
 
 
 class EbinexWebSocketInfo:
@@ -584,3 +563,42 @@ class EbinexWebSocketBalance:
         return cls(
             amount=next(iter(data.values()), 0.0), asset=next(iter(data.keys()), "")
         )
+
+@dataclass
+class ConfigMode:
+    orderType: str
+    status: str
+    payout: float
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'ConfigMode':
+        return cls(
+            orderType=data['orderType'],
+            status=data['status'],
+            payout=data['payout']
+        )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'orderType': self.orderType,
+            'status': self.status,
+            'payout': self.payout
+        }
+    
+@dataclass
+class SymbolConfig:
+    symbol: str
+    configModes: Dict[str, ConfigMode]
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'SymbolConfig':
+        return cls(
+            symbol=data['symbol'],
+            configModes={key: ConfigMode.from_dict(value) for key, value in data['configModes'].items()}
+        )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'symbol': self.symbol,
+            'configModes': {key: value.to_dict() for key, value in self.configModes.items()}
+        }
