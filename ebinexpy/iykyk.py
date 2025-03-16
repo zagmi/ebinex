@@ -7,7 +7,7 @@ from selenium.webdriver import Chrome
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from selenium.common.exceptions import NoSuchElementException as NSEE
-from typing import Any, Dict, List, Callable, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Callable, Optional, Protocol, TYPE_CHECKING
 
 WebDriver = Chrome
 NoSuchElementException = NSEE
@@ -21,7 +21,7 @@ DEFAULT_EXPIRATION = (datetime.now() + timedelta(days=30)).timestamp()
 if TYPE_CHECKING:
     from ebinexpy.source import Ebinex
 else:
-    Ebinex = Any
+    pass
 
 
 class Direction(Enum):
@@ -37,7 +37,10 @@ class Direction(Enum):
         if hasattr(other, "name"):
             return self.name != other.name
         return NotImplemented
-
+    
+    def __hash__(self):
+        return hash(self.name)
+    
 class BinaryOrderType(Enum):
     OPTION = auto()
 
@@ -55,6 +58,9 @@ class Timeframe(Enum):
         if hasattr(other, "name"):
             return self.name != other.name
         return NotImplemented
+
+    def __hash__(self):
+        return hash(self.name)
 
 class Statuses(Enum):
     WIN = auto()
@@ -78,6 +84,9 @@ class Statuses(Enum):
             return self.name != other.name
         return NotImplemented
     
+    def __hash__(self):
+        return hash(self.name)
+
 class Environment(Enum):
     REAL = auto()
     TEST = auto()
@@ -106,6 +115,9 @@ class Environment(Enum):
         if hasattr(other, "name"):
             return self.name != other.name
         return NotImplemented
+
+    def __hash__(self):
+        return hash(self.name)
 
 @dataclass
 class Credentials:
