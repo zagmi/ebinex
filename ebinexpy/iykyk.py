@@ -192,7 +192,7 @@ class EbinexOrder:
     candle_time_frame: str
     candle_start_time: int
     symbol: str
-    direction: str
+    direction: 'Direction'
     price: float
     cop: float
     ccp: float
@@ -254,7 +254,7 @@ class EbinexOrder:
             candle_time_frame=data.get("candleTimeFrame"),
             candle_start_time=data.get("candleStartTime"),
             symbol=data.get("symbol"),
-            direction=data.get("direction"),
+            direction=Direction[data.get("direction")],
             price=data.get("price"),
             cop=data.get("cop"),
             ccp=data.get("ccp"),
