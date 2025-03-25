@@ -55,7 +55,6 @@ class Ebinex:
 
         self.book: tp.EbinexBook
         self.subs: Dict[str, str] = {}
-        self.balance: tp.EbinexWebSocketBalance
         self.ords: Dict[str, tp.EbinexOrder] = {}
         self.trades: Dict[str, List[tp.EbinexTrade]] = {}
 
@@ -256,10 +255,6 @@ class Ebinex:
                             self.trades[symbol] = []
                         self.trades[symbol].append(trade)
                         self.signals.trade.put(self.trades)
-
-                    case Events.USER_BALANCE:
-                        self.balance = tp.EbinexWebSocketBalance.from_dict(payload)
-                        self.signals.balance.put(self.balance)
 
                     case Events.SINGLE_USER_ORDER:
                         order = tp.EbinexOrder.from_dict(payload)
@@ -497,7 +492,6 @@ class Ebinex:
             sub_id = self.stomp.subscribe(destination)
             self.subs[sub_id] = destination
 
-        self.signals.balance.get()
         setattr(self.config, nameof(environment), environment)
 
     def orders(
