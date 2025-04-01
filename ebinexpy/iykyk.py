@@ -328,10 +328,19 @@ class EbinexConfig:
             environment=Environment[data.get("environment")],
         )
 
-class ConfigMode(TypedDict):
+@dataclass
+class ConfigMode:
     orderType: str
     status: str
     payout: float
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ConfigMode":
+        return cls(
+            orderType=data["orderType"],
+            status=data["status"],
+            payout=data["payout"]
+        )
 
 @dataclass
 class EbinexSymbol:
@@ -348,7 +357,7 @@ class EbinexSymbol:
     @classmethod
     def from_dict(cls, data: dict) -> "EbinexSymbol":
         config_modes = {
-            OrderType(mode_key): mode_value 
+            OrderType(mode_key): ConfigMode.from_dict(mode_value)
             for mode_key, mode_value in data.get("configModes", {}).items()
         }
         
