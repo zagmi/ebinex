@@ -369,7 +369,7 @@ class Ebinex:
     def broker_now_time(self) -> int:
         return int(time.time() * 1000) - self.server_time
 
-    def order(self, order_type: tp.BinaryOrderType, amount: int, direction: tp.Direction) -> Tuple[tp.EbinexOrder, Callable[[List[tp.Statuses]], None]]:
+    def order(self, order_type: tp.OrderType, amount: int, direction: tp.Direction) -> Tuple[tp.EbinexOrder, Callable[[List[tp.Statuses]], None]]:
         """
         Places an order for a specified amount and direction.
 
