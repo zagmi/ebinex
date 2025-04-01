@@ -8,7 +8,7 @@ from selenium.webdriver import Chrome
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from selenium.common.exceptions import NoSuchElementException as NSEE
-from typing import Any, Dict, List, Callable, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Callable, Optional, TypedDict, TYPE_CHECKING
 
 WebDriver = Chrome
 NoSuchElementException = NSEE
@@ -42,8 +42,9 @@ class Direction(Enum):
     def __hash__(self):
         return hash(self.name)
     
-class BinaryOrderType(Enum):
+class OrderType(Enum):
     OPTION = auto()
+    RETRACTION_ENDTIME = auto()
 
 class Timeframe(Enum):
     M1 = 1
@@ -282,7 +283,7 @@ class EbinexOrder:
 
 @dataclass
 class EbinexTrade:
-    binary_order_type: BinaryOrderType
+    binary_order_type: OrderType
     candle_end_time: int
     account_id: str
     timeframe: Timeframe
@@ -327,30 +328,30 @@ class EbinexConfig:
             environment=Environment[data.get("environment")],
         )
 
+class ConfigMode(TypedDict):
+    orderType: str
+    status: str
+    payout: float
 
+@dataclass
 class EbinexSymbol:
-    def __init__(
-        self,
-        symbol: str,
-        symbolType: str,
-        symbolLabel: str,
-        marketStatus: str,
-        openMarketTime: Optional[str],
-        closeMarketTime: Optional[str],
-        payout: float,
-        hrs24PercentualChange: float,
-    ):
-        self.symbol = symbol
-        self.symbolType = symbolType
-        self.symbolLabel = symbolLabel
-        self.marketStatus = marketStatus
-        self.openMarketTime = openMarketTime
-        self.closeMarketTime = closeMarketTime
-        self.payout = payout
-        self.hrs24PercentualChange = hrs24PercentualChange
+    symbol: str
+    symbolType: str
+    symbolLabel: str
+    marketStatus: str
+    openMarketTime: Optional[str]
+    closeMarketTime: Optional[str]
+    payout: float
+    hrs24PercentualChange: float
+    configModes: Dict[OrderType, ConfigMode]  
 
     @classmethod
     def from_dict(cls, data: dict) -> "EbinexSymbol":
+        config_modes = {
+            OrderType(mode_key): mode_value 
+            for mode_key, mode_value in data.get("configModes", {}).items()
+        }
+        
         return cls(
             symbol=data["symbol"],
             symbolType=data["symbolType"],
@@ -360,6 +361,7 @@ class EbinexSymbol:
             closeMarketTime=data.get("closeMarketTime"),
             payout=data["payout"],
             hrs24PercentualChange=data["hrs24PercentualChange"],
+            configModes=config_modes
         )
 
 
