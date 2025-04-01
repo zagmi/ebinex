@@ -356,10 +356,13 @@ class EbinexSymbol:
 
     @classmethod
     def from_dict(cls, data: dict) -> "EbinexSymbol":
-        config_modes = {
-            OrderType(mode_key): ConfigMode.from_dict(mode_value)
-            for mode_key, mode_value in data.get("configModes", {}).items()
-        }
+        config_modes = {}
+        for mode_key, mode_value in data.get("configModes", {}).items():
+            try:
+                enum_key = OrderType[mode_key] 
+                config_modes[enum_key] = ConfigMode.from_dict(mode_value)
+            except KeyError:
+                continue  
         
         return cls(
             symbol=data["symbol"],
