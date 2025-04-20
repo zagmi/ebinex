@@ -117,8 +117,8 @@ class Ebinex:
                 options.add_argument("--headless=new")
                 options.add_argument("--disable-dev-shm-usage")
                 options.add_argument(f"user-agent={UserAgent.random()}")
-                service = DriverService(executable_path=executable_path)
-                driver = WebDriver(options=options, service=None)
+                
+                driver = WebDriver(options=options)
                 driver.get(self.urls.login)
 
                 WebDriverWait(driver, 10).until(lambda d: "Entrar" in d.page_source)
@@ -234,7 +234,7 @@ class Ebinex:
 
         def on_close(client: StompClient, code: int):
             """Method to process Stomp close"""
-            pass
+            self.stomp.reconnect()
 
         @utils.sockthis
         def on_message(client: StompClient, message: Union[Dict, List]):
@@ -277,16 +277,6 @@ class Ebinex:
         )
 
         """Use me if you know what you're doing, otherwise don't piss me off"""
-
-        def reconnector():
-            while True:
-                if not self.stomp.connected.is_set():
-                    self.stomp.reconnect()
-                time.sleep(5)
-
-        reconnector_thread = threading.Thread(target=reconnector)
-        reconnector_thread.daemon = True
-        reconnector_thread.start()
         
         self.stomp.connect()
         self.signals.trade.get()
